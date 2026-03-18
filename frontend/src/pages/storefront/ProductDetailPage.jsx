@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchProductBySlug, fetchProducts } from '../../services/productService.js';
@@ -11,12 +11,21 @@ const tabs = [
   { id: 'reviews', label: 'Đánh giá' },
 ];
 
+/** Tìm variant khớp combination đã chọn */
+const findVariant = (variants = [], selected = {}) => {
+  if (!variants.length) return null;
+  return variants.find((v) => {
+    const combo = v.combination instanceof Map ? Object.fromEntries(v.combination) : v.combination;
+    return Object.entries(selected).every(([k, val]) => combo?.[k] === val);
+  }) || null;
+};
+
 const ProductDetailPage = () => {
   const { slug } = useParams();
   const addItem = useCartStore((s) => s.addItem);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedOptions, setSelectedOptions] = useState({});
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
 
@@ -26,6 +35,26 @@ const ProductDetailPage = () => {
   });
 
   const product = productRes?.data?.data;
+
+  const hasVariants = product?.options?.length > 0 && product?.variants?.length > 0;
+
+  /* Variant khớp với lựa chọn hiện tại */
+  const matchedVariant = useMemo(
+    () => (hasVariants ? findVariant(product.variants, selectedOptions) : null),
+    [hasVariants, product?.variants, selectedOptions],
+  );
+
+  /* Giá hiển thị: variant giá riêng → salePrice → price */
+  const displayPrice = matchedVariant?.price || product?.salePrice || product?.price || 0;
+
+  /* Stock hiển thị */
+  const displayStock = hasVariants
+    ? (matchedVariant?.stock ?? null)
+    : (product?.stock ?? 0);
+
+  /* Kiểm tra đã chọn đủ tất cả option chưa */
+  const allOptionsSelected = !hasVariants ||
+    (product?.options || []).every((opt) => !!selectedOptions[opt.name]);
 
   const { data: relatedRes } = useQuery({
     queryKey: ['relatedProducts', product?.category?._id],
@@ -41,13 +70,18 @@ const ProductDetailPage = () => {
 
   const handleAddToCart = () => {
     if (!product) return;
+    if (hasVariants && !allOptionsSelected) return;
+    const variantLabel = Object.entries(selectedOptions)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(' / ');
     addItem({
       id: product._id,
       name: product.name,
-      price: product.salePrice || product.price,
+      price: displayPrice,
       image: product.images?.[0],
       quantity,
-      variant: selectedSize || null,
+      variant: variantLabel || null,
+      variantCombo: hasVariants ? selectedOptions : null,
     });
   };
 
@@ -126,39 +160,72 @@ const ProductDetailPage = () => {
               {product.name}
             </h1>
             <p className="text-xs text-slate-500">
-              {product.material === 'gold' && 'Vàng'}
-              {product.material === 'silver' && 'Bạc'}
-              {product.material === 'platinum' && 'Bạch kim'} {product.gemstone && ` • ${product.gemstone}`}
+              {[product.material, product.gemstone].filter(Boolean).join(' • ')}
             </p>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-xl font-semibold text-slate-900">
-              {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
-                product.salePrice || product.price,
-              )}
+              {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(displayPrice)}
             </span>
-            {product.salePrice && (
+            {product.salePrice && !matchedVariant?.price && (
               <span className="text-xs text-slate-400 line-through">
-                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
-                  product.price,
-                )}
+                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.price)}
+              </span>
+            )}
+            {displayStock !== null && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${displayStock > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+                {displayStock > 0 ? `Còn ${displayStock}` : 'Hết hàng'}
               </span>
             )}
           </div>
 
-          {product.size?.length > 0 && (
+          {/* Variant options (Shopify-style) */}
+          {hasVariants && product.options.map((opt) => (
+            <div key={opt.name} className="space-y-2">
+              <p className="text-[11px] font-semibold text-slate-900">{opt.name}</p>
+              <div className="flex flex-wrap gap-2">
+                {opt.values.map((val) => {
+                  const isSelected = selectedOptions[opt.name] === val;
+                  /* Kiểm tra option này có variant còn hàng không */
+                  const tentative = { ...selectedOptions, [opt.name]: val };
+                  const match = findVariant(product.variants, tentative);
+                  const outOfStock = match !== null && match.stock === 0;
+                  return (
+                    <button
+                      key={val}
+                      type="button"
+                      disabled={outOfStock}
+                      onClick={() => setSelectedOptions((prev) => ({ ...prev, [opt.name]: val }))}
+                      className={`px-3 py-1.5 rounded-full border text-[11px] transition-all ${
+                        isSelected
+                          ? 'border-amber-500 bg-amber-50 text-amber-700 font-medium'
+                          : outOfStock
+                          ? 'border-slate-200 text-slate-300 line-through cursor-not-allowed'
+                          : 'border-slate-200 text-slate-700 hover:border-amber-300'
+                      }`}
+                    >
+                      {val}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Fallback: size array cũ nếu không dùng variant system */}
+          {!hasVariants && product.size?.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-slate-900">Chọn size</p>
+              <p className="text-[11px] font-semibold text-slate-900">Size</p>
               <div className="flex flex-wrap gap-2">
                 {product.size.map((size) => (
                   <button
                     key={size}
                     type="button"
-                    onClick={() => setSelectedSize(size)}
+                    onClick={() => setSelectedOptions({ Size: size })}
                     className={`px-3 py-1.5 rounded-full border text-[11px] ${
-                      selectedSize === size
+                      selectedOptions.Size === size
                         ? 'border-amber-500 bg-amber-50 text-amber-700'
-                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                        : 'border-slate-200 text-slate-700 hover:border-amber-300'
                     }`}
                   >
                     {size}
@@ -188,17 +255,26 @@ const ProductDetailPage = () => {
             </div>
           </div>
 
+          {hasVariants && !allOptionsSelected && (
+            <p className="text-[10px] text-amber-600">
+              ← Vui lòng chọn đầy đủ {product.options.map((o) => o.name).join(', ')} trước khi thêm vào giỏ
+            </p>
+          )}
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={handleAddToCart}
-              className="inline-flex flex-1 items-center justify-center rounded-full bg-amber-600 text-xs font-medium text-white py-2.5 hover:bg-amber-700 transition shadow-sm"
+              disabled={!allOptionsSelected || displayStock === 0}
+              className="inline-flex flex-1 items-center justify-center rounded-full bg-amber-600 text-xs font-medium text-white py-2.5 hover:bg-amber-700 transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Thêm vào giỏ
+              {displayStock === 0 ? 'Hết hàng' : 'Thêm vào giỏ'}
             </button>
             <button
               type="button"
-              className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 text-xs font-medium text-slate-800 py-2.5 hover:bg-slate-50 transition"
+              onClick={() => { handleAddToCart(); }}
+              disabled={!allOptionsSelected || displayStock === 0}
+              className="inline-flex flex-1 items-center justify-center rounded-full border border-amber-400 text-xs font-medium text-amber-700 py-2.5 hover:bg-amber-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Mua ngay
             </button>
@@ -227,10 +303,41 @@ const ProductDetailPage = () => {
         <div className="text-xs text-slate-600 leading-relaxed">
           {activeTab === 'description' && (product.description || 'Chưa có mô tả chi tiết.')}
           {activeTab === 'material' && (
-            <p>
-              Chất liệu được tuyển chọn kỹ lưỡng, phù hợp sử dụng hàng ngày. Thông tin chi tiết về
-              tuổi vàng, xi mạ hoặc đá quý có thể được bổ sung tuỳ từng sản phẩm.
-            </p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {product.material && (
+                  <div className="p-3 rounded-xl" style={{ background: '#f4f1eb' }}>
+                    <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#b6915d' }}>Chất liệu</p>
+                    <p className="font-medium text-slate-800">{product.material}</p>
+                  </div>
+                )}
+                {product.gemstone && (
+                  <div className="p-3 rounded-xl" style={{ background: '#f4f1eb' }}>
+                    <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#b6915d' }}>Đá quý</p>
+                    <p className="font-medium text-slate-800">{product.gemstone}</p>
+                  </div>
+                )}
+                {product.weight && (
+                  <div className="p-3 rounded-xl" style={{ background: '#f4f1eb' }}>
+                    <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#b6915d' }}>Trọng lượng</p>
+                    <p className="font-medium text-slate-800">{product.weight} g</p>
+                  </div>
+                )}
+                {product.category?.name && (
+                  <div className="p-3 rounded-xl" style={{ background: '#f4f1eb' }}>
+                    <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#b6915d' }}>Danh mục</p>
+                    <p className="font-medium text-slate-800">{product.category.name}</p>
+                  </div>
+                )}
+              </div>
+              {product.materialDetail ? (
+                <p className="text-slate-600 leading-relaxed whitespace-pre-line">{product.materialDetail}</p>
+              ) : (
+                <p className="text-slate-500 italic">
+                  Sản phẩm được làm từ chất liệu cao cấp, qua kiểm định chất lượng. Bảo quản nơi khô ráo, tránh tiếp xúc hoá chất và nước biển. Liên hệ cửa hàng để được tư vấn thêm.
+                </p>
+              )}
+            </div>
           )}
           {activeTab === 'reviews' && <p>Chức năng đánh giá sẽ được bổ sung sau.</p>}
         </div>

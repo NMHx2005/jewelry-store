@@ -1,2 +1,63 @@
 @import "tailwindcss";
 
+@theme {
+  /* ── Gold / Primary ─────────────────────────── */
+  --color-amber-50:  #fdf9f2;
+  --color-amber-100: #f7efd9;
+  --color-amber-200: #eeddb0;
+  --color-amber-300: #e2c887;
+  --color-amber-400: #d1aa73;
+  --color-amber-500: #cda873;
+  --color-amber-600: #b6915d;
+  --color-amber-700: #967444;
+  --color-amber-800: #7a5c35;
+  --color-amber-900: #5e4527;
+
+  /* ── Warm Beige / Background ────────────────── */
+  --color-slate-50:  #faf8f5;
+  --color-slate-100: #f4f1eb;
+  --color-slate-200: #ebe5dc;
+
+  /* ── Soft Dark Brown / Text ─────────────────── */
+  --color-slate-900: #4e4842;
+  --color-slate-800: #5f5953;
+  --color-slate-700: #6e655d;
+  --color-slate-600: #7d7268;
+  --color-slate-500: #9c9088;
+  --color-slate-400: #b8afa8;
+  --color-slate-300: #d3cdc8;
+
+  /* ── Functional colors (giữ nguyên) ─────────── */
+  --color-emerald-400: #1f8f4e;
+  --color-emerald-500: #1a7a43;
+  --color-red-400:     #c85c5c;
+  --color-red-500:     #b54a4a;
+}
+
+/* ── Base styles ─────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: #faf8f5;
+  color: #5f5953;
+}
+
+/* ── Scrollbar ───────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #f4f1eb;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1aa73;
+  border-radius: 99px;
+}

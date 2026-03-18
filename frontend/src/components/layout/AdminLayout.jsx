@@ -34,7 +34,7 @@ const AdminLogin = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
         <div className="flex flex-col items-center mb-6">
-          <img src="/logo-diamond.png" alt="Logo" className="h-12 w-auto object-contain mb-3" />
+          <img src="/logo-diamond.png" alt="Logo" className="h-14 w-14 object-cover rounded-full ring-2 ring-amber-200/60 mb-3" />
           <p className="text-xs text-gray-400">Đăng nhập để tiếp tục</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 text-sm">
@@ -95,7 +95,7 @@ const AdminLayout = () => {
         {/* Logo */}
         <div className="px-5 py-5 border-b border-gray-100">
           <Link to="/">
-            <img src="/logo-diamond.png" alt="Logo" className="h-8 w-auto object-contain" />
+            <img src="/logo-diamond.png" alt="Logo" className="h-8 w-8 object-cover rounded-full ring-1 ring-amber-200/60" />
           </Link>
         </div>
 

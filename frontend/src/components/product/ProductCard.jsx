@@ -21,9 +21,10 @@ const ProductCard = ({ product }) => {
   return (
     <Link
       to={`/product/${product.slug}`}
-      className="group relative rounded-2xl bg-white/80 border border-slate-100 shadow-sm overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+      className="group relative rounded-2xl border shadow-sm overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+      style={{ background: '#fdfbf8', borderColor: '#ebe5dc' }}
     >
-      <div className="aspect-square overflow-hidden bg-slate-50">
+      <div className="aspect-square overflow-hidden" style={{ background: '#f4f1eb' }}>
         {product.images?.[0] ? (
           <img
             src={product.images[0]}

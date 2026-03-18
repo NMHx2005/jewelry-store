@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
@@ -11,7 +11,14 @@ import {
   adminUploadImage,
 } from '../../services/adminService.js';
 
-const MATERIALS = ['gold', 'silver', 'platinum'];
+const MATERIAL_SUGGESTIONS = [
+  'Vàng 9K', 'Vàng 10K', 'Vàng 14K', 'Vàng 18K', 'Vàng 24K',
+  'Vàng trắng 14K', 'Vàng trắng 18K',
+  'Vàng hồng 14K', 'Vàng hồng 18K',
+  'Bạc 925', 'Bạc 999',
+  'Bạch kim 950', 'Platinum 950',
+  'Titanium', 'Thép không gỉ',
+];
 const fmt = (n) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
 
@@ -117,11 +124,255 @@ const ImageManager = ({ existingImages, onChange }) => {
   );
 };
 
+/* ─── Variant Manager ─────────────────────────────────────── */
+const cartesian = (arrays) =>
+  arrays.reduce(
+    (acc, opt) => {
+      const out = [];
+      acc.forEach((combo) => opt.values.forEach((val) => out.push({ ...combo, [opt.name]: val })));
+      return out;
+    },
+    [{}],
+  );
+
+const VariantManager = ({ initialOptions = [], initialVariants = [], onChange }) => {
+  const [options, setOptions] = useState(() =>
+    initialOptions.length > 0
+      ? initialOptions
+      : [],
+  );
+  const [variants, setVariants] = useState(() => {
+    if (initialVariants.length > 0) {
+      return initialVariants.map((v) => ({
+        combination: v.combination instanceof Map ? Object.fromEntries(v.combination) : (v.combination || {}),
+        stock: v.stock ?? 0,
+        price: v.price ?? '',
+        sku: v.sku ?? '',
+      }));
+    }
+    return [];
+  });
+  const [newOptionName, setNewOptionName] = useState('');
+  const [newValues, setNewValues] = useState({});
+
+  const notify = useCallback((nextOpts, nextVars) => {
+    onChange({ options: nextOpts, variants: nextVars });
+  }, [onChange]);
+
+  const regenerateVariants = (nextOptions, currentVariants) => {
+    if (!nextOptions.length || nextOptions.some((o) => !o.values.length)) return [];
+    const combos = cartesian(nextOptions);
+    return combos.map((combo) => {
+      const existing = currentVariants.find((v) => {
+        const c = v.combination || {};
+        return Object.entries(combo).every(([k, val]) => c[k] === val);
+      });
+      return {
+        combination: combo,
+        stock: existing?.stock ?? 0,
+        price: existing?.price ?? '',
+        sku: existing?.sku ?? '',
+      };
+    });
+  };
+
+  const addOption = () => {
+    if (!newOptionName.trim()) return;
+    if (options.find((o) => o.name === newOptionName.trim())) {
+      toast.error('Option này đã tồn tại');
+      return;
+    }
+    const nextOpts = [...options, { name: newOptionName.trim(), values: [] }];
+    const nextVars = regenerateVariants(nextOpts, variants);
+    setOptions(nextOpts);
+    setVariants(nextVars);
+    setNewOptionName('');
+    notify(nextOpts, nextVars);
+  };
+
+  const removeOption = (optName) => {
+    const nextOpts = options.filter((o) => o.name !== optName);
+    const nextVars = regenerateVariants(nextOpts, variants);
+    setOptions(nextOpts);
+    setVariants(nextVars);
+    notify(nextOpts, nextVars);
+  };
+
+  const addValue = (optName) => {
+    const val = (newValues[optName] || '').trim();
+    if (!val) return;
+    const nextOpts = options.map((o) =>
+      o.name === optName && !o.values.includes(val)
+        ? { ...o, values: [...o.values, val] }
+        : o,
+    );
+    const nextVars = regenerateVariants(nextOpts, variants);
+    setOptions(nextOpts);
+    setVariants(nextVars);
+    setNewValues((prev) => ({ ...prev, [optName]: '' }));
+    notify(nextOpts, nextVars);
+  };
+
+  const removeValue = (optName, val) => {
+    const nextOpts = options.map((o) =>
+      o.name === optName ? { ...o, values: o.values.filter((v) => v !== val) } : o,
+    );
+    const nextVars = regenerateVariants(nextOpts, variants);
+    setOptions(nextOpts);
+    setVariants(nextVars);
+    notify(nextOpts, nextVars);
+  };
+
+  const updateVariant = (idx, field, value) => {
+    const nextVars = variants.map((v, i) => (i === idx ? { ...v, [field]: value } : v));
+    setVariants(nextVars);
+    notify(options, nextVars);
+  };
+
+  return (
+    <div className="space-y-4 border border-amber-100 rounded-xl p-4 bg-amber-50/30">
+      <p className="text-xs font-semibold text-gray-700">Biến thể sản phẩm</p>
+      <p className="text-[10px] text-gray-400">
+        Thêm option (VD: Size, Màu) → thêm giá trị → bảng biến thể sẽ tự tạo ra.
+      </p>
+
+      {/* Existing options */}
+      {options.map((opt) => (
+        <div key={opt.name} className="space-y-2 bg-white rounded-xl p-3 border border-gray-100">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-800">{opt.name}</span>
+            <button
+              type="button"
+              onClick={() => removeOption(opt.name)}
+              className="text-[10px] text-red-400 hover:text-red-600"
+            >
+              Xoá option
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {opt.values.map((v) => (
+              <span
+                key={v}
+                className="inline-flex items-center gap-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full"
+              >
+                {v}
+                <button
+                  type="button"
+                  onClick={() => removeValue(opt.name, v)}
+                  className="text-amber-400 hover:text-red-500 leading-none"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                value={newValues[opt.name] || ''}
+                onChange={(e) => setNewValues((p) => ({ ...p, [opt.name]: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addValue(opt.name))}
+                placeholder="+ giá trị"
+                className="text-[11px] border border-dashed border-gray-300 rounded-full px-2 py-0.5 w-24 outline-none focus:border-amber-400"
+              />
+              <button
+                type="button"
+                onClick={() => addValue(opt.name)}
+                className="text-[11px] text-amber-600 font-medium"
+              >
+                Thêm
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Add new option */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newOptionName}
+          onChange={(e) => setNewOptionName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())}
+          placeholder="Tên option (VD: Size, Màu, Tuổi vàng)"
+          className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-amber-400"
+        />
+        <button
+          type="button"
+          onClick={addOption}
+          className="text-xs px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-white rounded-lg font-medium"
+        >
+          + Option
+        </button>
+      </div>
+
+      {/* Variants table */}
+      {variants.length > 0 && (
+        <div className="overflow-x-auto">
+          <p className="text-[10px] text-gray-500 mb-2">
+            {variants.length} biến thể — điền giá và tồn kho cho từng biến thể:
+          </p>
+          <table className="w-full text-xs border border-gray-100 rounded-xl overflow-hidden">
+            <thead className="bg-gray-50 text-[10px] text-gray-500">
+              <tr>
+                <th className="text-left px-3 py-2">Biến thể</th>
+                <th className="text-left px-3 py-2">Giá (₫)</th>
+                <th className="text-left px-3 py-2">Tồn kho</th>
+                <th className="text-left px-3 py-2">SKU</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 bg-white">
+              {variants.map((v, idx) => {
+                const label = Object.entries(v.combination).map(([k, val]) => `${k}: ${val}`).join(' / ');
+                return (
+                  <tr key={label}>
+                    <td className="px-3 py-2 text-gray-700 font-medium whitespace-nowrap">{label}</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={v.price}
+                        onChange={(e) => updateVariant(idx, 'price', e.target.value)}
+                        placeholder="để trống = giá gốc"
+                        className="w-28 border border-gray-200 rounded-lg px-2 py-1 text-[11px] outline-none focus:border-amber-400"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={v.stock}
+                        min={0}
+                        onChange={(e) => updateVariant(idx, 'stock', Number(e.target.value))}
+                        className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-[11px] outline-none focus:border-amber-400"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        value={v.sku}
+                        onChange={(e) => updateVariant(idx, 'sku', e.target.value)}
+                        placeholder="SKU-001"
+                        className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-[11px] outline-none focus:border-amber-400"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ─── Form Modal ─── */
 const ProductForm = ({ initial, categories, onClose }) => {
   const qc = useQueryClient();
   const isEdit = !!initial;
   const [finalImages, setFinalImages] = useState(initial?.images || []);
+  const [variantData, setVariantData] = useState({
+    options: initial?.options || [],
+    variants: initial?.variants || [],
+  });
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     defaultValues: {
@@ -130,10 +381,10 @@ const ProductForm = ({ initial, categories, onClose }) => {
       price: initial?.price || '',
       salePrice: initial?.salePrice || '',
       stock: initial?.stock || '',
-      material: initial?.material || 'gold',
+      material: initial?.material || '',
       gemstone: initial?.gemstone || '',
       weight: initial?.weight || '',
-      size: initial?.size?.join(',') || '',
+      materialDetail: initial?.materialDetail || '',
       category: initial?.category?._id || initial?.category || '',
       isActive: initial?.isActive ?? true,
       isFeatured: initial?.isFeatured ?? false,
@@ -151,15 +402,28 @@ const ProductForm = ({ initial, categories, onClose }) => {
   });
 
   const onSubmit = async (values) => {
+    const hasVariants = variantData.options.length > 0 && variantData.variants.length > 0;
+    const totalStock = hasVariants
+      ? variantData.variants.reduce((s, v) => s + (Number(v.stock) || 0), 0)
+      : Number(values.stock);
+
     const payload = {
       ...values,
       price: Number(values.price),
       salePrice: values.salePrice ? Number(values.salePrice) : undefined,
-      stock: Number(values.stock),
+      stock: totalStock,
       weight: values.weight ? Number(values.weight) : undefined,
-      size: values.size ? values.size.split(',').map((s) => s.trim()).filter(Boolean) : [],
       tags: values.tags ? values.tags.split(',').map((s) => s.trim()).filter(Boolean) : [],
       images: finalImages,
+      options: hasVariants ? variantData.options : [],
+      variants: hasVariants
+        ? variantData.variants.map((v) => ({
+            combination: v.combination,
+            stock: Number(v.stock) || 0,
+            price: v.price ? Number(v.price) : undefined,
+            sku: v.sku || undefined,
+          }))
+        : [],
     };
     try {
       if (isEdit) {
@@ -176,7 +440,7 @@ const ProductForm = ({ initial, categories, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">
             {isEdit ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}
@@ -225,24 +489,19 @@ const ProductForm = ({ initial, categories, onClose }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-gray-600 text-xs font-medium mb-1 block">Tồn kho *</label>
-              <input
-                {...register('stock', { required: true })}
-                type="number"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition"
-              />
-            </div>
-            <div>
-              <label className="text-gray-600 text-xs font-medium mb-1 block">Trọng lượng (g)</label>
-              <input
-                {...register('weight')}
-                type="number"
-                step="0.1"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition"
-              />
-            </div>
+          <div>
+            <label className="text-gray-600 text-xs font-medium mb-1 block">
+              Tồn kho
+              {variantData.options.length > 0 && (
+                <span className="ml-1 text-[10px] text-amber-500 font-normal">(tự tính từ variants)</span>
+              )}
+            </label>
+            <input
+              {...register('stock')}
+              type="number"
+              disabled={variantData.options.length > 0}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition disabled:bg-gray-50 disabled:text-gray-400"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -259,15 +518,16 @@ const ProductForm = ({ initial, categories, onClose }) => {
               </select>
             </div>
             <div>
-              <label className="text-gray-600 text-xs font-medium mb-1 block">Chất liệu</label>
-              <select
-                {...register('material')}
-                className="w-full border border-gray-200 bg-white rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition"
-              >
-                {MATERIALS.map((m) => (
-                  <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
-                ))}
-              </select>
+              <label className="text-gray-600 text-xs font-medium mb-1 block">Chất liệu *</label>
+              <input
+                {...register('material', { required: true })}
+                list="material-list"
+                className={`w-full border rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition ${errors.material ? 'border-red-400' : 'border-gray-200'}`}
+                placeholder="VD: Vàng 18K, Bạc 925..."
+              />
+              <datalist id="material-list">
+                {MATERIAL_SUGGESTIONS.map((m) => <option key={m} value={m} />)}
+              </datalist>
             </div>
           </div>
 
@@ -276,18 +536,38 @@ const ProductForm = ({ initial, categories, onClose }) => {
               <label className="text-gray-600 text-xs font-medium mb-1 block">Đá quý</label>
               <input
                 {...register('gemstone')}
+                list="gemstone-list"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition"
                 placeholder="Diamond, Ruby..."
               />
+              <datalist id="gemstone-list">
+                {['Kim cương', 'Kim cương nhân tạo CVD', 'Moissanite', 'Ruby', 'Sapphire', 'Emerald',
+                  'Topaz', 'Amethyst', 'Ngọc trai', 'Ngọc trai nước ngọt', 'Cubic Zirconia', 'Moonstone',
+                  'Opal', 'Garnet', 'Tourmaline'].map((g) => <option key={g} value={g} />)}
+              </datalist>
             </div>
             <div>
-              <label className="text-gray-600 text-xs font-medium mb-1 block">Size (cách dấu ,)</label>
+              <label className="text-gray-600 text-xs font-medium mb-1 block">Trọng lượng (g)</label>
               <input
-                {...register('size')}
+                {...register('weight')}
+                type="number"
+                step="0.1"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition"
-                placeholder="S, M, L, 6, 7"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="text-gray-600 text-xs font-medium mb-1 block">
+              Thông tin chất liệu
+              <span className="ml-1 font-normal text-gray-400">(hiển thị trong tab Chất liệu ở trang sản phẩm)</span>
+            </label>
+            <textarea
+              {...register('materialDetail')}
+              rows={3}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition resize-none"
+              placeholder="VD: Vàng 18K độ tinh khiết 75%, đã qua kiểm định chất lượng. Bảo quản bằng khăn mềm, tránh tiếp xúc hoá chất. Bảo hành 12 tháng."
+            />
           </div>
 
           <div>
@@ -298,6 +578,13 @@ const ProductForm = ({ initial, categories, onClose }) => {
               placeholder="necklace, wedding, gold"
             />
           </div>
+
+          {/* Variant Manager */}
+          <VariantManager
+            initialOptions={initial?.options || []}
+            initialVariants={initial?.variants || []}
+            onChange={setVariantData}
+          />
 
           <div>
             <label className="text-gray-600 text-xs font-medium mb-1 block">Mô tả</label>

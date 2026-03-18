@@ -18,11 +18,12 @@ const CartDrawer = () => {
         onClick={closeCart}
       />
       <aside
-        className={`fixed right-0 top-0 z-40 h-full w-full max-w-sm bg-white shadow-2xl border-l border-slate-200 flex flex-col transition-transform duration-300 ${
+        className={`fixed right-0 top-0 z-40 h-full w-full max-w-sm shadow-2xl flex flex-col transition-transform duration-300 ${
           isCartOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
+        style={{ background: '#faf8f5', borderLeft: '1px solid #ebe5dc' }}
       >
-        <header className="h-14 flex items-center justify-between px-4 border-b border-slate-200">
+        <header className="h-14 flex items-center justify-between px-4" style={{ borderBottom: '1px solid #ebe5dc' }}>
           <h2 className="text-sm font-semibold tracking-tight">Giỏ hàng</h2>
           <button
             type="button"
@@ -39,9 +40,10 @@ const CartDrawer = () => {
           {items.map((item) => (
             <div
               key={`${item.id}-${item.variant || 'default'}`}
-              className="flex gap-3 border border-slate-100 rounded-xl p-2"
+              className="flex gap-3 rounded-xl p-2"
+              style={{ border: '1px solid #ebe5dc', background: '#fdfbf8' }}
             >
-              <div className="h-16 w-16 rounded-lg bg-slate-50 overflow-hidden">
+              <div className="h-16 w-16 rounded-lg overflow-hidden" style={{ background: '#f4f1eb' }}>
                 {item.image ? (
                   <img
                     src={item.image}
@@ -57,7 +59,9 @@ const CartDrawer = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-slate-900 line-clamp-2">{item.name}</p>
                 {item.variant && (
-                  <p className="text-[11px] text-slate-500 mt-0.5">Phân loại: {item.variant}</p>
+                  <p className="text-[10px] mt-0.5 px-2 py-0.5 rounded-full inline-block" style={{ background: '#f4f1eb', color: '#b6915d' }}>
+                    {item.variant}
+                  </p>
                 )}
                 <div className="mt-1 flex items-center justify-between">
                   <div className="flex items-center gap-1 text-xs">

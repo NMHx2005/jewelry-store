@@ -1,5 +1,21 @@
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
+import slugify from 'slugify';
+
+const makeSlug = async (name, excludeId = null) => {
+  let base = slugify(name, { lower: true, strict: true, locale: 'vi' });
+  let slug = base;
+  let counter = 1;
+  while (true) {
+    const query = excludeId
+      ? { slug, _id: { $ne: excludeId } }
+      : { slug };
+    const exists = await Product.findOne(query).lean();
+    if (!exists) break;
+    slug = `${base}-${counter++}`;
+  }
+  return slug;
+};
 
 export const getProducts = async (req, res, next) => {
   try {
@@ -87,9 +103,36 @@ export const getProductBySlug = async (req, res, next) => {
   }
 };
 
+const parseVariantFields = (body) => {
+  const data = { ...body };
+
+  if (typeof data.options === 'string') {
+    try { data.options = JSON.parse(data.options); } catch { data.options = []; }
+  }
+  if (typeof data.variants === 'string') {
+    try { data.variants = JSON.parse(data.variants); } catch { data.variants = []; }
+  }
+  if (typeof data.size === 'string') {
+    try { data.size = JSON.parse(data.size); } catch { data.size = data.size ? [data.size] : []; }
+  }
+  if (typeof data.tags === 'string') {
+    try { data.tags = JSON.parse(data.tags); } catch { data.tags = []; }
+  }
+
+  /* Tự tổng hợp stock từ variants nếu có */
+  if (Array.isArray(data.variants) && data.variants.length > 0) {
+    data.stock = data.variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+  }
+
+  return data;
+};
+
 export const createProduct = async (req, res, next) => {
   try {
-    const data = req.body;
+    const data = parseVariantFields(req.body);
+    if (!data.slug && data.name) {
+      data.slug = await makeSlug(data.name);
+    }
     const product = await Product.create(data);
     res.status(201).json({ success: true, data: product });
   } catch (err) {
@@ -100,7 +143,11 @@ export const createProduct = async (req, res, next) => {
 export const updateProduct = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const product = await Product.findByIdAndUpdate(id, req.body, {
+    const data = parseVariantFields(req.body);
+    if (!data.slug && data.name) {
+      data.slug = await makeSlug(data.name, id);
+    }
+    const product = await Product.findByIdAndUpdate(id, data, {
       new: true,
       runValidators: true,
     });
