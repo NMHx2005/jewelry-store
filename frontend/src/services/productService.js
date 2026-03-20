@@ -10,7 +10,9 @@ export const fetchProductBySlug = (slug) => api.get(`/products/${slug}`);
 export const fetchFeaturedProducts = () =>
   api.get('/products', { params: { isFeatured: true, limit: 8 } });
 
-export const fetchCategories = () => api.get('/categories');
+export const fetchCategories = (params) => api.get('/categories', { params });
+
+export const fetchIndustries = (params) => api.get('/industries', { params });
 
 export const fetchBanners = () => api.get('/cms/banners');
 

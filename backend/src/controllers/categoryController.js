@@ -1,12 +1,29 @@
 import slugify from 'slugify';
 import Category from '../models/Category.js';
+import Industry from '../models/Industry.js';
 
 const makeSlug = (name) =>
   slugify(name, { lower: true, strict: true, locale: 'vi' });
 
 export const getCategories = async (req, res, next) => {
   try {
-    const categories = await Category.find({}).sort({ level: 1, name: 1 });
+    const { industry } = req.query;
+    const filter = {};
+
+    if (industry) {
+      const isObjectId = /^[a-f\d]{24}$/i.test(industry);
+      if (isObjectId) {
+        filter.industry = industry;
+      } else {
+        const ind = await Industry.findOne({ slug: industry });
+        if (ind) filter.industry = ind._id;
+        else filter.industry = null; // no match → return empty
+      }
+    }
+
+    const categories = await Category.find(filter)
+      .populate('industry', 'name slug')
+      .sort({ level: 1, name: 1 });
     res.json({ success: true, data: categories });
   } catch (err) {
     next(err);

@@ -70,16 +70,17 @@ export const createOrderFromCart = async (req, res, next) => {
       note,
     });
 
-    cart.items = [];
-    await cart.save();
-
-    // cart.items đã được populate, dùng luôn để lấy tên sản phẩm
+    // Build richItems BEFORE clearing cart (cart.items still populated here)
     const richItems = cart.items.map((i) => ({
       name: i.product?.name,
       qty: i.qty,
       price: i.product?.price || 0,
       variant: i.variant,
     }));
+
+    cart.items = [];
+    await cart.save();
+
     sendTelegram(buildOrderNotification(order, richItems));
 
     res.status(201).json({ success: true, data: order });

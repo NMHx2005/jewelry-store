@@ -1,5 +1,6 @@
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
+import Industry from '../models/Industry.js';
 import slugify from 'slugify';
 
 const makeSlug = async (name, excludeId = null) => {
@@ -25,6 +26,7 @@ export const getProducts = async (req, res, next) => {
       sort = '-createdAt',
       search,
       category,
+      industry,
       material,
       minPrice,
       maxPrice,
@@ -42,8 +44,23 @@ export const getProducts = async (req, res, next) => {
       ];
     }
 
+    if (industry) {
+      // Filter all categories belonging to this industry (by slug or ObjectId)
+      const isObjectId = /^[a-f\d]{24}$/i.test(industry);
+      const ind = isObjectId
+        ? await Industry.findById(industry)
+        : await Industry.findOne({ slug: industry });
+      if (ind) {
+        const cats = await Category.find({ industry: ind._id }).select('_id');
+        filter.category = { $in: cats.map((c) => c._id) };
+      }
+    }
+
     if (category) {
-      const cat = await Category.findOne({ slug: category });
+      const isObjectId = /^[a-f\d]{24}$/i.test(category);
+      const cat = isObjectId
+        ? await Category.findById(category)
+        : await Category.findOne({ slug: category });
       if (cat) {
         filter.category = cat._id;
       }

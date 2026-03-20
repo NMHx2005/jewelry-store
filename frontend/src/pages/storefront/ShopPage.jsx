@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { fetchProducts, fetchCategories } from '../../services/productService.js';
+import { fetchProducts, fetchCategories, fetchIndustries } from '../../services/productService.js';
 import ProductCard from '../../components/product/ProductCard.jsx';
 
 const ShopPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(Number(searchParams.get('page')) || 1);
   const [sort, setSort] = useState(searchParams.get('sort') || '-createdAt');
-
   const [filters, setFilters] = useState({
+    industry: searchParams.get('industry') || '',
     category: searchParams.get('category') || '',
     search: searchParams.get('search') || '',
   });
@@ -22,9 +22,15 @@ const ShopPage = () => {
     setSearchParams(params);
   };
 
+  const { data: industriesRes } = useQuery({
+    queryKey: ['industries'],
+    queryFn: () => fetchIndustries(),
+  });
+
   const { data: categoriesRes } = useQuery({
-    queryKey: ['categories'],
-    queryFn: fetchCategories,
+    queryKey: ['categories', filters.industry],
+    queryFn: () =>
+      fetchCategories(filters.industry ? { industry: filters.industry } : undefined),
   });
 
   const {
@@ -39,14 +45,27 @@ const ShopPage = () => {
         limit: 12,
         sort,
         search: filters.search || undefined,
+        industry: filters.industry || undefined,
         category: filters.category || undefined,
       }),
     keepPreviousData: true,
   });
 
+  const industries = industriesRes?.data?.data || [];
   const categories = categoriesRes?.data?.data || [];
   const products = productsRes?.data?.data || [];
   const pagination = productsRes?.data?.pagination;
+
+  const activeIndustry = industries.find((i) => i.slug === filters.industry);
+  // Categories already scoped to industry by the API query
+  const visibleCategories = categories;
+
+  const handleIndustryChange = (slug) => {
+    const nextFilters = { ...filters, industry: slug, category: '' };
+    setFilters(nextFilters);
+    setPage(1);
+    applySearchParams({ ...nextFilters, page: 1, sort });
+  };
 
   const handleFilterChange = (key, value) => {
     const nextFilters = { ...filters, [key]: value };
@@ -68,14 +87,14 @@ const ShopPage = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 lg:py-10 space-y-5">
-      {/* Top bar: title + search + sort */}
+      {/* Top bar */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <p className="text-[11px] uppercase tracking-[0.28em] text-amber-600 mb-1">
             Cửa hàng
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            Bộ sưu tập trang sức
+            {activeIndustry ? activeIndustry.name : 'Tất cả sản phẩm'}
           </h1>
         </div>
         <div className="flex flex-col md:flex-row md:items-center gap-2 text-xs w-full md:w-auto">
@@ -104,34 +123,67 @@ const ShopPage = () => {
         </div>
       </div>
 
-      {/* Category pills */}
-      <div className="flex gap-2 overflow-x-auto pb-1 text-[11px]">
-        <button
-          type="button"
-          onClick={() => handleFilterChange('category', '')}
-          className={`px-3 py-1.5 rounded-full border ${
-            !filters.category
-              ? 'border-amber-500 bg-amber-50 text-amber-700'
-              : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          Tất cả
-        </button>
-        {categories.map((cat) => (
+      {/* Industry tabs — only show if there are multiple industries */}
+      {industries.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1 text-[11px]">
           <button
-            key={cat._id}
             type="button"
-            onClick={() => handleFilterChange('category', cat.slug)}
-            className={`px-3 py-1.5 rounded-full border whitespace-nowrap ${
-              filters.category === cat.slug
+            onClick={() => handleIndustryChange('')}
+            className={`px-4 py-1.5 rounded-full border font-medium whitespace-nowrap transition ${
+              !filters.industry
+                ? 'border-amber-500 bg-amber-500 text-white'
+                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Tất cả
+          </button>
+          {industries.map((ind) => (
+            <button
+              key={ind._id}
+              type="button"
+              onClick={() => handleIndustryChange(ind.slug)}
+              className={`px-4 py-1.5 rounded-full border font-medium whitespace-nowrap transition ${
+                filters.industry === ind.slug
+                  ? 'border-amber-500 bg-amber-500 text-white'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {ind.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Category pills */}
+      {visibleCategories.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1 text-[11px]">
+          <button
+            type="button"
+            onClick={() => handleFilterChange('category', '')}
+            className={`px-3 py-1.5 rounded-full border ${
+              !filters.category
                 ? 'border-amber-500 bg-amber-50 text-amber-700'
                 : 'border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {cat.name}
+            Tất cả danh mục
           </button>
-        ))}
-      </div>
+          {visibleCategories.map((cat) => (
+            <button
+              key={cat._id}
+              type="button"
+              onClick={() => handleFilterChange('category', cat.slug)}
+              className={`px-3 py-1.5 rounded-full border whitespace-nowrap ${
+                filters.category === cat.slug
+                  ? 'border-amber-500 bg-amber-50 text-amber-700'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Product list */}
       <section className="space-y-4">
@@ -150,7 +202,7 @@ const ShopPage = () => {
           </p>
         )}
 
-        {pagination && pagination.totalPages > 1 && (
+        {pagination && pagination.pages > 1 && (
           <div className="flex items-center justify-center gap-3 mt-4 text-xs">
             <button
               type="button"
@@ -161,12 +213,12 @@ const ShopPage = () => {
               Trước
             </button>
             <span className="text-slate-500">
-              Trang {page} / {pagination.totalPages}
+              Trang {page} / {pagination.pages}
             </span>
             <button
               type="button"
-              onClick={() => handlePageChange(Math.min(pagination.totalPages, page + 1))}
-              disabled={page === pagination.totalPages || isFetching}
+              onClick={() => handlePageChange(Math.min(pagination.pages, page + 1))}
+              disabled={page === pagination.pages || isFetching}
               className="px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 disabled:opacity-40 hover:bg-slate-50"
             >
               Sau
@@ -179,4 +231,3 @@ const ShopPage = () => {
 };
 
 export default ShopPage;
-

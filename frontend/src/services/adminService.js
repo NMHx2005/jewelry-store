@@ -12,10 +12,17 @@ export const adminUploadProductImages = (id, formData) =>
   });
 
 // ─── Categories ────────────────────────────────────────────
-export const adminGetCategories = () => api.get('/categories');
+export const adminGetCategories = (params) => api.get('/categories', { params });
 export const adminCreateCategory = (data) => api.post('/categories', data);
 export const adminUpdateCategory = (id, data) => api.put(`/categories/${id}`, data);
 export const adminDeleteCategory = (id) => api.delete(`/categories/${id}`);
+
+// ─── Industries ─────────────────────────────────────────────
+export const adminGetIndustries = (params) =>
+  api.get('/industries', { params: { showAll: 'true', ...params } });
+export const adminCreateIndustry = (data) => api.post('/industries', data);
+export const adminUpdateIndustry = (id, data) => api.put(`/industries/${id}`, data);
+export const adminDeleteIndustry = (id) => api.delete(`/industries/${id}`);
 
 // ─── Orders ────────────────────────────────────────────────
 export const adminGetOrders = (params) => api.get('/orders', { params });

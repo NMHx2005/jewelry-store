@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
-import { fetchBanners, fetchCategories, fetchFeaturedProducts } from '../../services/productService.js';
+import { fetchBanners, fetchIndustries, fetchFeaturedProducts } from '../../services/productService.js';
 import ProductCard from '../../components/product/ProductCard.jsx';
 
 const HomePage = () => {
@@ -10,9 +10,9 @@ const HomePage = () => {
     queryFn: fetchBanners,
   });
 
-  const { data: categoriesRes } = useQuery({
-    queryKey: ['categories'],
-    queryFn: fetchCategories,
+  const { data: industriesRes } = useQuery({
+    queryKey: ['industries'],
+    queryFn: () => fetchIndustries(),
   });
 
   const { data: featuredRes } = useQuery({
@@ -21,7 +21,7 @@ const HomePage = () => {
   });
 
   const banners = bannersRes?.data?.data || [];
-  const categories = categoriesRes?.data?.data || [];
+  const industries = (industriesRes?.data?.data || []).slice(0, 4);
   const featured = featuredRes?.data?.data || [];
 
   return (
@@ -67,23 +67,52 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Featured categories */}
+      {/* Featured industries */}
       <section id="collections" className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold tracking-tight text-slate-900">
-            Danh mục nổi bật
+            Ngành hàng nổi bật
           </h2>
+          <a href="/shop" className="text-[11px] text-slate-500 hover:text-amber-600 transition-colors">
+            Xem tất cả
+          </a>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {(categories.slice(0, 4) || []).map((cat) => (
+          {industries.map((ind) => (
             <a
-              key={cat._id}
-              href={`/shop?category=${cat.slug}`}
-              className="group relative rounded-2xl border border-slate-100 bg-white/70 px-4 py-5 flex flex-col justify-between overflow-hidden hover:border-amber-200 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200"
+              key={ind._id}
+              href={`/shop?industry=${ind.slug}`}
+              className="group relative rounded-2xl border border-slate-100 bg-white overflow-hidden hover:border-amber-200 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200"
             >
-              <div className="text-xs font-medium text-slate-900 mb-1">{cat.name}</div>
-              <p className="text-[11px] text-slate-500 mb-3">Tinh tuyển cho từng phong cách.</p>
-              {/* <div className="absolute right-2 bottom-2 h-10 w-10 rounded-full bg-amber-100/80 border border-amber-200" /> */}
+              {/* Ảnh ngành */}
+              <div className="h-36 overflow-hidden bg-slate-100">
+                {ind.image ? (
+                  <img
+                    src={ind.image}
+                    alt={ind.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-linear-to-br from-amber-50 to-slate-100 flex items-center justify-center">
+                    <span className="text-4xl text-amber-200">◈</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Tên + mô tả */}
+              <div className="px-4 py-3">
+                <p className="text-xs font-semibold text-slate-900 group-hover:text-amber-600 transition-colors">
+                  {ind.name}
+                </p>
+                {ind.description && (
+                  <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                    {ind.description}
+                  </p>
+                )}
+                <span className="mt-2 inline-flex items-center gap-1 text-[11px] text-amber-600 font-medium">
+                  Khám phá <span className="group-hover:translate-x-0.5 transition-transform inline-block">→</span>
+                </span>
+              </div>
             </a>
           ))}
         </div>

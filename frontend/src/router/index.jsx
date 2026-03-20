@@ -9,6 +9,7 @@ import ProductsPage from '../pages/admin/ProductsPage.jsx';
 import OrdersPage from '../pages/admin/OrdersPage.jsx';
 import CMSPage from '../pages/admin/CMSPage.jsx';
 import CategoriesPage from '../pages/admin/CategoriesPage.jsx';
+import IndustriesPage from '../pages/admin/IndustriesPage.jsx';
 import MainLayout from '../components/layout/MainLayout.jsx';
 import AdminLayout from '../components/layout/AdminLayout.jsx';
 
@@ -26,6 +27,7 @@ const AppRouter = () => (
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="products" element={<ProductsPage />} />
+        <Route path="industries" element={<IndustriesPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="cms" element={<CMSPage />} />

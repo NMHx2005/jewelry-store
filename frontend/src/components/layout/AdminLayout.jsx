@@ -75,6 +75,7 @@ const AdminLogin = () => {
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', end: true, icon: '▣' },
   { to: '/admin/products', label: 'Sản phẩm', icon: '◈' },
+  { to: '/admin/industries', label: 'Ngành hàng', icon: '◧' },
   { to: '/admin/categories', label: 'Danh mục', icon: '◫' },
   { to: '/admin/orders', label: 'Đơn hàng', icon: '◎' },
   { to: '/admin/cms', label: 'Giao diện', icon: '◉' },
