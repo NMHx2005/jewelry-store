@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchProductBySlug, fetchProducts } from '../../services/productService.js';
 import useCartStore from '../../store/cartStore.js';
@@ -22,8 +22,10 @@ const findVariant = (variants = [], selected = {}) => {
 
 const ProductDetailPage = () => {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const addItem = useCartStore((s) => s.addItem);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [variantImage, setVariantImage] = useState(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState({});
   const [quantity, setQuantity] = useState(1);
@@ -55,6 +57,21 @@ const ProductDetailPage = () => {
   /* Kiểm tra đã chọn đủ tất cả option chưa */
   const allOptionsSelected = !hasVariants ||
     (product?.options || []).every((opt) => !!selectedOptions[opt.name]);
+
+  /* Helper lấy ảnh của một giá trị option */
+  const getValueImage = (opt, val) => {
+    if (!opt?.valueImages) return null;
+    const imgs = opt.valueImages instanceof Map ? Object.fromEntries(opt.valueImages) : opt.valueImages;
+    return imgs?.[val] || null;
+  };
+
+  /* Xử lý chọn option — nếu có ảnh thì cập nhật ảnh chính */
+  const handleOptionSelect = (optName, val) => {
+    setSelectedOptions((prev) => ({ ...prev, [optName]: val }));
+    const opt = product?.options?.find((o) => o.name === optName);
+    const img = getValueImage(opt, val);
+    if (img) setVariantImage(img);
+  };
 
   const { data: relatedRes } = useQuery({
     queryKey: ['relatedProducts', product?.category?._id],
@@ -95,6 +112,9 @@ const ProductDetailPage = () => {
 
   const images = product.images && product.images.length > 0 ? product.images : [''];
 
+  /* Ảnh hiển thị chính: ưu tiên ảnh variant, fallback gallery */
+  const mainDisplayImage = variantImage || images[selectedImage] || '';
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 lg:py-10 space-y-10">
       <nav className="text-[11px] text-slate-500 mb-2">
@@ -111,9 +131,9 @@ const ProductDetailPage = () => {
             className="aspect-square rounded-3xl bg-slate-50 overflow-hidden border border-slate-100 cursor-zoom-in group relative"
             onClick={() => setIsLightboxOpen(true)}
           >
-            {images[selectedImage] ? (
+            {mainDisplayImage ? (
               <img
-                src={images[selectedImage]}
+                src={mainDisplayImage}
                 alt={product.name}
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
               />
@@ -131,9 +151,9 @@ const ProductDetailPage = () => {
               <button
                 key={index}
                 type="button"
-                onClick={() => setSelectedImage(index)}
+                onClick={() => { setSelectedImage(index); setVariantImage(null); }}
                 className={`h-16 w-16 rounded-2xl border ${
-                  index === selectedImage
+                  !variantImage && index === selectedImage
                     ? 'border-amber-500'
                     : 'border-slate-200 hover:border-amber-200'
                 } overflow-hidden bg-slate-50 flex-shrink-0`}
@@ -180,37 +200,87 @@ const ProductDetailPage = () => {
           </div>
 
           {/* Variant options (Shopify-style) */}
-          {hasVariants && product.options.map((opt) => (
-            <div key={opt.name} className="space-y-2">
-              <p className="text-[11px] font-semibold text-slate-900">{opt.name}</p>
-              <div className="flex flex-wrap gap-2">
-                {opt.values.map((val) => {
-                  const isSelected = selectedOptions[opt.name] === val;
-                  /* Kiểm tra option này có variant còn hàng không */
-                  const tentative = { ...selectedOptions, [opt.name]: val };
-                  const match = findVariant(product.variants, tentative);
-                  const outOfStock = match !== null && match.stock === 0;
-                  return (
-                    <button
-                      key={val}
-                      type="button"
-                      disabled={outOfStock}
-                      onClick={() => setSelectedOptions((prev) => ({ ...prev, [opt.name]: val }))}
-                      className={`px-3 py-1.5 rounded-full border text-[11px] transition-all ${
-                        isSelected
-                          ? 'border-amber-500 bg-amber-50 text-amber-700 font-medium'
-                          : outOfStock
-                          ? 'border-slate-200 text-slate-300 line-through cursor-not-allowed'
-                          : 'border-slate-200 text-slate-700 hover:border-amber-300'
-                      }`}
-                    >
-                      {val}
-                    </button>
-                  );
-                })}
+          {hasVariants && product.options.map((opt) => {
+            const hasValueImages = opt.values.some((v) => !!getValueImage(opt, v));
+            return (
+              <div key={opt.name} className="space-y-2">
+                <p className="text-[11px] font-semibold text-slate-900">
+                  {opt.name}
+                  {selectedOptions[opt.name] && (
+                    <span className="ml-1 font-normal text-slate-500">— {selectedOptions[opt.name]}</span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {opt.values.map((val) => {
+                    const isSelected = selectedOptions[opt.name] === val;
+                    const tentative = { ...selectedOptions, [opt.name]: val };
+                    const match = findVariant(product.variants, tentative);
+                    const outOfStock = match !== null && match.stock === 0;
+                    const img = getValueImage(opt, val);
+
+                    if (hasValueImages) {
+                      /* Swatch dạng ảnh */
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          disabled={outOfStock}
+                          onClick={() => handleOptionSelect(opt.name, val)}
+                          title={val}
+                          className={`relative h-14 w-14 rounded-2xl border-2 overflow-hidden transition-all flex-shrink-0 ${
+                            isSelected
+                              ? 'border-amber-500 shadow-md'
+                              : outOfStock
+                              ? 'border-slate-200 opacity-40 cursor-not-allowed'
+                              : 'border-transparent hover:border-amber-300'
+                          }`}
+                        >
+                          {img ? (
+                            <img src={img} alt={val} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="h-full w-full bg-slate-100 flex items-center justify-center text-[9px] text-slate-400">
+                              {val}
+                            </div>
+                          )}
+                          {outOfStock && (
+                            <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                              <span className="text-[8px] text-slate-400">Hết</span>
+                            </div>
+                          )}
+                          {isSelected && (
+                            <div className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 flex items-center justify-center">
+                              <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 10 10" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2 5l2 2 4-4" />
+                              </svg>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    }
+
+                    /* Pill text thông thường */
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        disabled={outOfStock}
+                        onClick={() => handleOptionSelect(opt.name, val)}
+                        className={`px-3 py-1.5 rounded-full border text-[11px] transition-all ${
+                          isSelected
+                            ? 'border-amber-500 bg-amber-50 text-amber-700 font-medium'
+                            : outOfStock
+                            ? 'border-slate-200 text-slate-300 line-through cursor-not-allowed'
+                            : 'border-slate-200 text-slate-700 hover:border-amber-300'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* Fallback: size array cũ nếu không dùng variant system */}
           {!hasVariants && product.size?.length > 0 && (
@@ -272,7 +342,7 @@ const ProductDetailPage = () => {
             </button>
             <button
               type="button"
-              onClick={() => { handleAddToCart(); }}
+              onClick={() => { handleAddToCart(); navigate('/checkout'); }}
               disabled={!allOptionsSelected || displayStock === 0}
               className="inline-flex flex-1 items-center justify-center rounded-full border border-amber-400 text-xs font-medium text-amber-700 py-2.5 hover:bg-amber-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -370,9 +440,9 @@ const ProductDetailPage = () => {
               Đóng
             </button>
             <div className="aspect-[4/3] rounded-3xl overflow-hidden bg-black/50">
-              {images[selectedImage] && (
+              {mainDisplayImage && (
                 <img
-                  src={images[selectedImage]}
+                  src={mainDisplayImage}
                   alt={product.name}
                   className="h-full w-full object-contain"
                 />

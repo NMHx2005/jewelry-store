@@ -4,6 +4,7 @@ import ShopPage from '../pages/storefront/ShopPage.jsx';
 import ProductDetailPage from '../pages/storefront/ProductDetailPage.jsx';
 import CartPage from '../pages/storefront/CartPage.jsx';
 import CheckoutPage from '../pages/storefront/CheckoutPage.jsx';
+import OrderSuccessPage from '../pages/storefront/OrderSuccessPage.jsx';
 import DashboardPage from '../pages/admin/DashboardPage.jsx';
 import ProductsPage from '../pages/admin/ProductsPage.jsx';
 import OrdersPage from '../pages/admin/OrdersPage.jsx';
@@ -22,6 +23,7 @@ const AppRouter = () => (
         <Route path="/product/:slug" element={<ProductDetailPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/order-success" element={<OrderSuccessPage />} />
       </Route>
 
       <Route path="/admin" element={<AdminLayout />}>

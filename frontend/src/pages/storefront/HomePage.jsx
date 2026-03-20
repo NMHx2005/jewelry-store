@@ -122,7 +122,7 @@ const HomePage = () => {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold tracking-tight text-slate-900">
-            Gợi ý dành riêng cho bạn
+            SALE
           </h2>
           <a href="/shop" className="text-[11px] text-slate-500 hover:text-amber-600">
             Xem tất cả

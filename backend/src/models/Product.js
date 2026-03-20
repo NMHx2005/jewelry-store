@@ -26,6 +26,7 @@ const productSchema = new mongoose.Schema(
       {
         name: { type: String, required: true },
         values: [{ type: String }],
+        valueImages: { type: Map, of: String, default: {} },
       },
     ],
     variants: [

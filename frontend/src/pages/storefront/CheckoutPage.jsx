@@ -1,9 +1,11 @@
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import useCartStore from '../../store/cartStore.js';
 import { createOrder } from '../../services/orderService.js';
 
 const CheckoutPage = () => {
+  const navigate = useNavigate();
   const items = useCartStore((s) => s.items);
   const clearCart = useCartStore((s) => s.clearCart);
 
@@ -29,7 +31,7 @@ const CheckoutPage = () => {
         return;
       }
 
-      await createOrder({
+      const res = await createOrder({
         paymentMethod: 'cod',
         shippingAddress: {
           fullName: values.fullName,
@@ -38,8 +40,21 @@ const CheckoutPage = () => {
         },
         items,
       });
-      toast.success('Đặt hàng thành công');
       clearCart();
+      navigate('/order-success', {
+        state: {
+          order: {
+            ...(res?.data?.data || res?.data || {}),
+            shippingAddress: {
+              fullName: values.fullName,
+              phone: values.phone,
+              address: values.address,
+            },
+            paymentMethod: 'cod',
+            items,
+          },
+        },
+      });
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);

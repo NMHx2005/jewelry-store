@@ -138,7 +138,14 @@ const cartesian = (arrays) =>
 const VariantManager = ({ initialOptions = [], initialVariants = [], onChange }) => {
   const [options, setOptions] = useState(() =>
     initialOptions.length > 0
-      ? initialOptions
+      ? initialOptions.map((o) => {
+          const raw = o.valueImages instanceof Map ? Object.fromEntries(o.valueImages) : (o.valueImages || {});
+          return {
+            ...o,
+            valueImages: raw,
+            hasImages: Object.keys(raw).length > 0,
+          };
+        })
       : [],
   );
   const [variants, setVariants] = useState(() => {
@@ -154,10 +161,56 @@ const VariantManager = ({ initialOptions = [], initialVariants = [], onChange })
   });
   const [newOptionName, setNewOptionName] = useState('');
   const [newValues, setNewValues] = useState({});
+  const [uploadingImg, setUploadingImg] = useState({});
 
   const notify = useCallback((nextOpts, nextVars) => {
-    onChange({ options: nextOpts, variants: nextVars });
+    onChange({
+      options: nextOpts.map(({ hasImages, ...rest }) => rest),
+      variants: nextVars,
+    });
   }, [onChange]);
+
+  const toggleHasImages = (optName) => {
+    const nextOpts = options.map((o) =>
+      o.name === optName ? { ...o, hasImages: !o.hasImages, valueImages: !o.hasImages ? o.valueImages : {} } : o,
+    );
+    setOptions(nextOpts);
+    notify(nextOpts, variants);
+  };
+
+  const uploadValueImage = async (optName, val, file) => {
+    const key = `${optName}__${val}`;
+    setUploadingImg((p) => ({ ...p, [key]: true }));
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await adminUploadImage(fd);
+      const url = res.data?.data?.url || '';
+      if (!url) return;
+      const nextOpts = options.map((o) =>
+        o.name === optName
+          ? { ...o, valueImages: { ...(o.valueImages || {}), [val]: url } }
+          : o,
+      );
+      setOptions(nextOpts);
+      notify(nextOpts, variants);
+    } catch {
+      toast.error('Upload ảnh thất bại');
+    } finally {
+      setUploadingImg((p) => ({ ...p, [key]: false }));
+    }
+  };
+
+  const removeValueImage = (optName, val) => {
+    const nextOpts = options.map((o) => {
+      if (o.name !== optName) return o;
+      const imgs = { ...(o.valueImages || {}) };
+      delete imgs[val];
+      return { ...o, valueImages: imgs };
+    });
+    setOptions(nextOpts);
+    notify(nextOpts, variants);
+  };
 
   const regenerateVariants = (nextOptions, currentVariants) => {
     if (!nextOptions.length || nextOptions.some((o) => !o.values.length)) return [];
@@ -241,47 +294,115 @@ const VariantManager = ({ initialOptions = [], initialVariants = [], onChange })
         <div key={opt.name} className="space-y-2 bg-white rounded-xl p-3 border border-gray-100">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-800">{opt.name}</span>
-            <button
-              type="button"
-              onClick={() => removeOption(opt.name)}
-              className="text-[10px] text-red-400 hover:text-red-600"
-            >
-              Xoá option
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {opt.values.map((v) => (
-              <span
-                key={v}
-                className="inline-flex items-center gap-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full"
-              >
-                {v}
-                <button
-                  type="button"
-                  onClick={() => removeValue(opt.name, v)}
-                  className="text-amber-400 hover:text-red-500 leading-none"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            <div className="flex items-center gap-1">
-              <input
-                type="text"
-                value={newValues[opt.name] || ''}
-                onChange={(e) => setNewValues((p) => ({ ...p, [opt.name]: e.target.value }))}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addValue(opt.name))}
-                placeholder="+ giá trị"
-                className="text-[11px] border border-dashed border-gray-300 rounded-full px-2 py-0.5 w-24 outline-none focus:border-amber-400"
-              />
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={!!opt.hasImages}
+                  onChange={() => toggleHasImages(opt.name)}
+                  className="accent-amber-500 w-3.5 h-3.5"
+                />
+                <span className="text-[10px] text-gray-500">Có ảnh riêng</span>
+              </label>
               <button
                 type="button"
-                onClick={() => addValue(opt.name)}
-                className="text-[11px] text-amber-600 font-medium"
+                onClick={() => removeOption(opt.name)}
+                className="text-[10px] text-red-400 hover:text-red-600"
               >
-                Thêm
+                Xoá option
               </button>
             </div>
+          </div>
+
+          {/* Values — hiển thị dạng grid khi có ảnh */}
+          {opt.hasImages ? (
+            <div className="grid grid-cols-3 gap-2">
+              {opt.values.map((v) => {
+                const imgUrl = opt.valueImages?.[v];
+                const key = `${opt.name}__${v}`;
+                const isUploading = !!uploadingImg[key];
+                return (
+                  <div key={v} className="border border-gray-100 rounded-xl p-2 space-y-1.5 text-center">
+                    <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-50">
+                      {imgUrl ? (
+                        <>
+                          <img src={imgUrl} alt={v} className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => removeValueImage(opt.name, v)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center"
+                          >
+                            ×
+                          </button>
+                        </>
+                      ) : (
+                        <label className={`flex flex-col items-center justify-center h-full cursor-pointer text-gray-400 hover:text-amber-500 transition ${isUploading ? 'pointer-events-none' : ''}`}>
+                          <span className="text-lg">{isUploading ? '…' : '+'}</span>
+                          <span className="text-[9px]">{isUploading ? 'Đang tải' : 'Upload'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={isUploading}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) uploadValueImage(opt.name, v, f);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[11px] text-gray-700 truncate flex-1">{v}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeValue(opt.name, v)}
+                        className="text-[10px] text-red-400 hover:text-red-600 leading-none flex-shrink-0"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {opt.values.map((v) => (
+                <span
+                  key={v}
+                  className="inline-flex items-center gap-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full"
+                >
+                  {v}
+                  <button
+                    type="button"
+                    onClick={() => removeValue(opt.name, v)}
+                    className="text-amber-400 hover:text-red-500 leading-none"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={newValues[opt.name] || ''}
+              onChange={(e) => setNewValues((p) => ({ ...p, [opt.name]: e.target.value }))}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addValue(opt.name))}
+              placeholder="+ giá trị"
+              className="text-[11px] border border-dashed border-gray-300 rounded-full px-2 py-0.5 w-24 outline-none focus:border-amber-400"
+            />
+            <button
+              type="button"
+              onClick={() => addValue(opt.name)}
+              className="text-[11px] text-amber-600 font-medium"
+            >
+              Thêm
+            </button>
           </div>
         </div>
       ))}
