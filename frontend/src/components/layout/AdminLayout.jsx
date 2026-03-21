@@ -46,7 +46,7 @@ const AdminLogin = () => {
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-gray-800 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition"
-              placeholder="admin@jewelry.com"
+              placeholder="Email admin..."
             />
           </div>
           <div>
@@ -111,10 +111,9 @@ const AdminLayout = () => {
               to={to}
               end={end}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition font-medium ${
-                  isActive
-                    ? 'bg-amber-50 text-amber-600'
-                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
+                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition font-medium ${isActive
+                  ? 'bg-amber-50 text-amber-600'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
                 }`
               }
             >
