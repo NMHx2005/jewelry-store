@@ -16,4 +16,6 @@ export const fetchIndustries = (params) => api.get('/industries', { params });
 
 export const fetchBanners = () => api.get('/cms/banners');
 
+export const fetchSettings = () => api.get('/cms/settings');
+
 

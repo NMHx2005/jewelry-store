@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
-import { fetchBanners, fetchIndustries, fetchFeaturedProducts } from '../../services/productService.js';
+import { fetchBanners, fetchIndustries, fetchFeaturedProducts, fetchSettings } from '../../services/productService.js';
 import ProductCard from '../../components/product/ProductCard.jsx';
 
 const HomePage = () => {
@@ -20,9 +20,42 @@ const HomePage = () => {
     queryFn: fetchFeaturedProducts,
   });
 
+  const { data: settingsRes } = useQuery({
+    queryKey: ['siteSettings'],
+    queryFn: fetchSettings,
+    staleTime: 60_000,
+  });
+
   const banners = bannersRes?.data?.data || [];
   const industries = (industriesRes?.data?.data || []).slice(0, 4);
   const featured = featuredRes?.data?.data || [];
+
+  const rawSettings = settingsRes?.data?.data || settingsRes?.data || {};
+  const commitment = rawSettings.commitment || {};
+  const testimonials = Array.isArray(rawSettings.testimonials) ? rawSettings.testimonials : [];
+
+  const cmLabel = commitment.label || 'Cam kết của chúng tôi';
+  const cmTitle = commitment.title || 'Trang sức — Không chỉ là món đồ';
+  const cmDesc =
+    commitment.description ||
+    'Mỗi sản phẩm được chọn lọc kỹ lưỡng từ những chất liệu cao cấp, được chế tác tỉ mỉ để trở thành vật kỷ niệm đồng hành cùng bạn suốt cuộc đời.';
+  const cmBullets = Array.isArray(commitment.bullets) && commitment.bullets.length
+    ? commitment.bullets
+    : [
+        'Chất liệu vàng, bạc, bạch kim chuẩn kiểm định',
+        'Đóng gói sang trọng — sẵn sàng làm quà tặng',
+        'Bảo hành & hỗ trợ làm sạch tận tâm',
+      ];
+  const displayTestimonials = testimonials.length
+    ? testimonials
+    : [
+        {
+          id: 'default',
+          quote:
+            '"Trang sức tinh tế, cầm trên tay cảm nhận rõ độ hoàn thiện. Đóng gói rất đẹp, phù hợp làm quà tặng."',
+          author: 'Minh Anh, HCM',
+        },
+      ];
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 space-y-12">
@@ -137,39 +170,38 @@ const HomePage = () => {
 
       {/* Promotion & testimonials */}
       <section className="grid md:grid-cols-2 gap-8">
+        {/* Commitment */}
         <div className="rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-slate-50 px-6 py-6 shadow-sm flex flex-col justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-[0.28em] text-amber-600 mb-2">
-              Cam kết của chúng tôi
+              {cmLabel}
             </p>
             <h3 className="text-sm font-semibold text-slate-900 mb-3">
-              Trang sức — Không chỉ là món đồ
+              {cmTitle}
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Mỗi sản phẩm được chọn lọc kỹ lưỡng từ những chất liệu cao cấp, được chế tác tỉ mỉ để
-              trở thành vật kỷ niệm đồng hành cùng bạn suốt cuộc đời.
+              {cmDesc}
             </p>
           </div>
           <ul className="mt-5 text-[11px] text-slate-500 space-y-2">
-            <li className="flex items-center gap-2">
-              <span className="text-amber-400">✦</span> Chất liệu vàng, bạc, bạch kim chuẩn kiểm định
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-amber-400">✦</span> Đóng gói sang trọng — sẵn sàng làm quà tặng
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-amber-400">✦</span> Bảo hành & hỗ trợ làm sạch tận tâm
-            </li>
+            {cmBullets.map((bullet, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span className="text-amber-400">✦</span> {bullet}
+              </li>
+            ))}
           </ul>
         </div>
+
+        {/* Testimonials */}
         <div className="rounded-3xl border border-slate-100 bg-white px-6 py-6 shadow-sm space-y-4">
           <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Cảm nhận khách hàng</p>
-          <div className="space-y-3 text-xs text-slate-600">
-            <p>
-              “Trang sức tinh tế, cầm trên tay cảm nhận rõ độ hoàn thiện. Đóng gói rất đẹp, phù hợp
-              làm quà tặng.”
-            </p>
-            <p className="text-[11px] text-slate-500">— Minh Anh, HCM</p>
+          <div className="space-y-5 text-xs text-slate-600">
+            {displayTestimonials.map((t) => (
+              <div key={t.id || t.author} className="space-y-1">
+                <p className="leading-relaxed">{t.quote}</p>
+                <p className="text-[11px] text-slate-500">— {t.author}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

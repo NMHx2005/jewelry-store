@@ -212,6 +212,193 @@ const SettingsSection = () => {
   );
 };
 
+/* ─── Homepage Content Section ─── */
+const HomepageContentSection = () => {
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ['adminSettings'], queryFn: adminGetSettings });
+  const raw = data?.data?.data || data?.data || {};
+
+  const commitment = raw.commitment || {};
+  const testimonials = raw.testimonials || [];
+
+  const [label, setLabel] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [bullets, setBullets] = useState(['', '', '']);
+  const [reviews, setReviews] = useState([{ id: Date.now().toString(), quote: '', author: '' }]);
+  const [saving, setSaving] = useState(false);
+
+  // Sync khi data load xong
+  const [synced, setSynced] = useState(false);
+  if (!synced && raw.commitment) {
+    setLabel(commitment.label || '');
+    setTitle(commitment.title || '');
+    setDescription(commitment.description || '');
+    setBullets(
+      Array.isArray(commitment.bullets) && commitment.bullets.length
+        ? commitment.bullets
+        : ['', '', ''],
+    );
+    setReviews(
+      Array.isArray(testimonials) && testimonials.length
+        ? testimonials
+        : [{ id: Date.now().toString(), quote: '', author: '' }],
+    );
+    setSynced(true);
+  }
+
+  const updateBullet = (i, val) => setBullets((prev) => prev.map((b, idx) => (idx === i ? val : b)));
+  const addBullet = () => setBullets((prev) => [...prev, '']);
+  const removeBullet = (i) => setBullets((prev) => prev.filter((_, idx) => idx !== i));
+
+  const updateReview = (i, field, val) =>
+    setReviews((prev) => prev.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
+  const addReview = () =>
+    setReviews((prev) => [...prev, { id: Date.now().toString(), quote: '', author: '' }]);
+  const removeReview = (i) => setReviews((prev) => prev.filter((_, idx) => idx !== i));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await adminUpdateSettings({
+        commitment: { label, title, description, bullets },
+        testimonials: reviews,
+      });
+      qc.invalidateQueries(['adminSettings']);
+      toast.success('Đã lưu nội dung trang chủ');
+    } catch {
+      toast.error('Lưu thất bại');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls =
+    'w-full border border-gray-200 rounded-lg px-3 py-2 text-gray-800 text-sm outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition';
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-6">
+      <h2 className="font-semibold text-gray-800">Nội dung trang chủ</h2>
+
+      {/* Commitment */}
+      <div className="space-y-3">
+        <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">
+          Khối Cam kết
+        </p>
+        <div>
+          <label className="text-xs text-gray-500 font-medium mb-1 block">Nhãn nhỏ phía trên</label>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} className={inputCls} placeholder="Cam kết của chúng tôi" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 font-medium mb-1 block">Tiêu đề</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Trang sức — Không chỉ là món đồ" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 font-medium mb-1 block">Mô tả</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className={inputCls}
+            placeholder="Mô tả ngắn về cam kết..."
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 font-medium mb-1 block">Danh sách điểm nổi bật</label>
+          <div className="space-y-2">
+            {bullets.map((b, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <input
+                  value={b}
+                  onChange={(e) => updateBullet(i, e.target.value)}
+                  className={inputCls}
+                  placeholder={`Điểm ${i + 1}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeBullet(i)}
+                  className="shrink-0 w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 transition text-sm"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addBullet}
+              className="text-xs text-amber-500 hover:text-amber-400 font-medium"
+            >
+              + Thêm điểm
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Testimonials */}
+      <div className="space-y-3 border-t border-gray-100 pt-5">
+        <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">
+          Cảm nhận khách hàng
+        </p>
+        <div className="space-y-4">
+          {reviews.map((r, i) => (
+            <div key={r.id || i} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-gray-400 font-medium">Đánh giá #{i + 1}</span>
+                {reviews.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeReview(i)}
+                    className="text-xs text-red-400 hover:text-red-500"
+                  >
+                    Xoá
+                  </button>
+                )}
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-0.5 block">Nội dung</label>
+                <textarea
+                  value={r.quote}
+                  onChange={(e) => updateReview(i, 'quote', e.target.value)}
+                  rows={2}
+                  className={inputCls}
+                  placeholder='"Sản phẩm rất đẹp..."'
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-0.5 block">Tác giả</label>
+                <input
+                  value={r.author}
+                  onChange={(e) => updateReview(i, 'author', e.target.value)}
+                  className={inputCls}
+                  placeholder="Minh Anh, HCM"
+                />
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addReview}
+            className="text-xs text-amber-500 hover:text-amber-400 font-medium"
+          >
+            + Thêm đánh giá
+          </button>
+        </div>
+      </div>
+
+      <div className="flex justify-end border-t border-gray-100 pt-4">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2 text-sm bg-amber-500 hover:bg-amber-400 text-white font-semibold rounded-lg transition disabled:opacity-60"
+        >
+          {saving ? 'Đang lưu...' : 'Lưu nội dung'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 /* ─── Main page ─── */
 const CMSPage = () => {
   const qc = useQueryClient();
@@ -303,6 +490,8 @@ const CMSPage = () => {
       </div>
 
       <SettingsSection />
+
+      <HomepageContentSection />
 
       {showForm && (
         <BannerForm initial={editing} onClose={() => { setShowForm(false); setEditing(null); }} />

@@ -1,4 +1,5 @@
 import Banner from '../models/Banner.js';
+import Settings from '../models/Settings.js';
 
 export const getBanners = async (req, res, next) => {
   try {
@@ -47,20 +48,39 @@ export const deleteBanner = async (req, res, next) => {
   }
 };
 
-// Để đơn giản, settings tạm thời là 1 document duy nhất trong collection 'settings'.
-let inMemorySettings = {
-  logoUrl: '',
-  primaryColor: '#f59e0b',
-  secondaryColor: '#ffffff',
-  homepageTagline: 'Trang sức tinh tế – Đẳng cấp vượt thời gian',
+// Lấy document settings duy nhất, tạo mới nếu chưa có (upsert pattern)
+const getOrCreateSettings = () =>
+  Settings.findOneAndUpdate(
+    { key: 'global' },
+    { $setOnInsert: { key: 'global' } },
+    { upsert: true, new: true },
+  );
+
+export const getSettings = async (req, res, next) => {
+  try {
+    const settings = await getOrCreateSettings();
+    res.json({ success: true, data: settings });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const getSettings = async (req, res) => {
-  res.json({ success: true, data: inMemorySettings });
-};
+export const updateSettings = async (req, res, next) => {
+  try {
+    const { commitment, testimonials, ...rest } = req.body;
+    const update = { ...rest };
 
-export const updateSettings = async (req, res) => {
-  inMemorySettings = { ...inMemorySettings, ...req.body };
-  res.json({ success: true, data: inMemorySettings });
+    if (commitment !== undefined) update.commitment = commitment;
+    if (testimonials !== undefined) update.testimonials = testimonials;
+
+    const settings = await Settings.findOneAndUpdate(
+      { key: 'global' },
+      { $set: update },
+      { upsert: true, new: true, runValidators: true },
+    );
+    res.json({ success: true, data: settings });
+  } catch (err) {
+    next(err);
+  }
 };
 
