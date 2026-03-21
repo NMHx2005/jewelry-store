@@ -3,6 +3,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   adminGetProducts,
   adminCreateProduct,
   adminUpdateProduct,
@@ -22,10 +40,127 @@ const MATERIAL_SUGGESTIONS = [
 const fmt = (n) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
 
+/* ─── Drag handle icon ─── */
+const DragHandle = (props) => (
+  <div
+    {...props}
+    title="Kéo để đổi vị trí"
+    className="cursor-grab active:cursor-grabbing flex items-center justify-center text-gray-400 hover:text-gray-600 select-none"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M7 4a1 1 0 110-2 1 1 0 010 2zM13 4a1 1 0 110-2 1 1 0 010 2zM7 10a1 1 0 110-2 1 1 0 010 2zM13 10a1 1 0 110-2 1 1 0 010 2zM7 16a1 1 0 110-2 1 1 0 010 2zM13 16a1 1 0 110-2 1 1 0 010 2z" />
+    </svg>
+  </div>
+);
+
+/* ─── Sortable image item ─── */
+const SortableImageItem = ({ id, isMain, onPreview, onSetMain, onRemove }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 20 : 'auto',
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group flex flex-col w-20 rounded-xl overflow-hidden border-2 transition-shadow ${
+        isMain ? 'border-amber-400' : 'border-gray-200'
+      } ${isDragging ? 'opacity-50 shadow-2xl' : 'shadow-sm'}`}
+    >
+      {/* ── Drag handle bar — luôn hiển thị, không bị overlay che ── */}
+      <div
+        {...attributes}
+        {...listeners}
+        title="Kéo để đổi vị trí"
+        className="h-5 bg-gray-100 hover:bg-amber-50 flex items-center justify-center gap-0.5 cursor-grab active:cursor-grabbing shrink-0 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M7 4a1 1 0 110-2 1 1 0 010 2zM13 4a1 1 0 110-2 1 1 0 010 2zM7 10a1 1 0 110-2 1 1 0 010 2zM13 10a1 1 0 110-2 1 1 0 010 2zM7 16a1 1 0 110-2 1 1 0 010 2zM13 16a1 1 0 110-2 1 1 0 010 2z" />
+        </svg>
+        {isMain && (
+          <span className="text-[8px] font-bold text-amber-500 leading-none">Chính</span>
+        )}
+      </div>
+
+      {/* ── Image + action buttons ── */}
+      <div className="relative w-20 h-16">
+        <img src={id} alt="img" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
+          <button
+            type="button"
+            onClick={() => onPreview(id)}
+            title="Xem phóng to"
+            className="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+          {!isMain && (
+            <button
+              type="button"
+              onClick={onSetMain}
+              title="Đặt làm ảnh chính"
+              className="w-6 h-6 rounded-full bg-amber-400 text-white text-xs flex items-center justify-center"
+            >
+              ★
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onRemove}
+            title="Xoá ảnh"
+            className="w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Image Preview Modal ─── */
+const ImagePreviewModal = ({ url, onClose }) => {
+  if (!url) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute -top-10 right-0 h-9 w-9 flex items-center justify-center rounded-full bg-white/15 border border-white/25 text-white hover:bg-white/25 transition"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <img
+          src={url}
+          alt="preview"
+          className="w-full max-h-[80vh] object-contain rounded-2xl"
+        />
+      </div>
+    </div>
+  );
+};
+
 /* ─── Image Manager inside form ─── */
 const ImageManager = ({ existingImages, onChange }) => {
   const [images, setImages] = useState(existingImages || []);
   const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const handleUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -51,14 +186,23 @@ const ImageManager = ({ existingImages, onChange }) => {
     }
   };
 
-  const remove = (idx) => {
-    const next = images.filter((_, i) => i !== idx);
+  const remove = (url) => {
+    const next = images.filter((u) => u !== url);
     setImages(next);
     onChange(next);
   };
 
-  const setMain = (idx) => {
-    const next = [images[idx], ...images.filter((_, i) => i !== idx)];
+  const setMain = (url) => {
+    const next = [url, ...images.filter((u) => u !== url)];
+    setImages(next);
+    onChange(next);
+  };
+
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const oldIdx = images.indexOf(active.id);
+    const newIdx = images.indexOf(over.id);
+    const next = arrayMove(images, oldIdx, newIdx);
     setImages(next);
     onChange(next);
   };
@@ -66,44 +210,22 @@ const ImageManager = ({ existingImages, onChange }) => {
   return (
     <div className="space-y-2">
       {images.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {images.map((url, idx) => (
-            <div key={url + idx} className="relative group">
-              <img
-                src={url}
-                alt={`img-${idx}`}
-                className={`w-20 h-20 object-cover rounded-xl border-2 transition ${
-                  idx === 0 ? 'border-amber-400' : 'border-transparent'
-                }`}
-              />
-              {idx === 0 && (
-                <span className="absolute top-1 left-1 bg-amber-400 text-white text-[9px] font-bold px-1 rounded">
-                  Chính
-                </span>
-              )}
-              <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
-                {idx !== 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setMain(idx)}
-                    title="Đặt làm ảnh chính"
-                    className="w-6 h-6 rounded-full bg-amber-400 text-white text-xs flex items-center justify-center"
-                  >
-                    ★
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => remove(idx)}
-                  title="Xoá ảnh"
-                  className="w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
-                >
-                  ×
-                </button>
-              </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={images} strategy={rectSortingStrategy}>
+            <div className="flex flex-wrap gap-2">
+              {images.map((url) => (
+                <SortableImageItem
+                  key={url}
+                  id={url}
+                  isMain={url === images[0]}
+                  onPreview={setPreviewUrl}
+                  onSetMain={() => setMain(url)}
+                  onRemove={() => remove(url)}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       <label className={`inline-flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded-xl px-4 py-2.5 text-xs text-gray-500 hover:border-amber-400 hover:text-amber-500 transition ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
@@ -118,8 +240,187 @@ const ImageManager = ({ existingImages, onChange }) => {
         />
       </label>
       <p className="text-[10px] text-gray-400">
-        Hover vào ảnh để xoá hoặc đặt làm ảnh chính (viền vàng).
+        Hover vào ảnh: ⠿ kéo thả đổi vị trí · 👁 phóng to · ★ đặt làm ảnh chính · × xoá.
       </p>
+
+      <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+    </div>
+  );
+};
+
+/* ─── Sortable Value Pill (text mode) ─── */
+const SortableValuePill = ({ id, optName, onRemove }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 10 : 'auto' };
+  return (
+    <span
+      ref={setNodeRef}
+      style={style}
+      className="inline-flex items-center gap-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-700 pl-1 pr-1 py-0.5 rounded-full select-none"
+    >
+      <span
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing px-0.5 text-amber-400 hover:text-amber-600"
+        title="Kéo để đổi vị trí"
+      >
+        ⠿
+      </span>
+      <span>{id}</span>
+      <button
+        type="button"
+        onClick={() => onRemove(optName, id)}
+        className="text-amber-400 hover:text-red-500 leading-none"
+      >
+        ×
+      </button>
+    </span>
+  );
+};
+
+/* ─── Sortable Value Card (image grid mode) ─── */
+const SortableValueCard = ({ id, optName, imgUrl, isUploading, onUpload, onRemoveImage, onRemoveValue }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 10 : 'auto' };
+  return (
+    <div ref={setNodeRef} style={style} className="border border-gray-100 rounded-xl p-2 space-y-1.5 text-center bg-white">
+      {/* Drag handle */}
+      <div className="flex justify-between items-center mb-1">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 text-[11px] px-0.5"
+          title="Kéo để đổi vị trí"
+        >
+          ⠿
+        </div>
+        <button
+          type="button"
+          onClick={() => onRemoveValue(optName, id)}
+          className="text-[10px] text-red-400 hover:text-red-600 leading-none"
+        >
+          ×
+        </button>
+      </div>
+      <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-50">
+        {imgUrl ? (
+          <>
+            <img src={imgUrl} alt={id} className="h-full w-full object-cover" />
+            <button
+              type="button"
+              onClick={() => onRemoveImage(optName, id)}
+              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center"
+            >
+              ×
+            </button>
+          </>
+        ) : (
+          <label className={`flex flex-col items-center justify-center h-full cursor-pointer text-gray-400 hover:text-amber-500 transition ${isUploading ? 'pointer-events-none' : ''}`}>
+            <span className="text-lg">{isUploading ? '…' : '+'}</span>
+            <span className="text-[9px]">{isUploading ? 'Đang tải' : 'Upload'}</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={isUploading}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(optName, id, f); e.target.value = ''; }}
+            />
+          </label>
+        )}
+      </div>
+      <p className="text-[11px] text-gray-700 truncate">{id}</p>
+    </div>
+  );
+};
+
+/* ─── Sortable Option Block ─── */
+const SortableOptionBlock = ({
+  opt, newValues, setNewValues, uploadingImg,
+  toggleHasImages, removeOption, addValue, removeValue,
+  uploadValueImage, removeValueImage, onValueDragEnd,
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: opt.name });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1, zIndex: isDragging ? 20 : 'auto' };
+
+  const valueSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  return (
+    <div ref={setNodeRef} style={style} className="space-y-2 bg-white rounded-xl p-3 border border-gray-100">
+      <div className="flex items-center gap-2">
+        {/* Drag handle cho option */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 shrink-0 px-0.5"
+          title="Kéo để đổi thứ tự option"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-4" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M7 4a1 1 0 110-2 1 1 0 010 2zM13 4a1 1 0 110-2 1 1 0 010 2zM7 10a1 1 0 110-2 1 1 0 010 2zM13 10a1 1 0 110-2 1 1 0 010 2zM7 16a1 1 0 110-2 1 1 0 010 2zM13 16a1 1 0 110-2 1 1 0 010 2z" />
+          </svg>
+        </div>
+        <span className="text-xs font-semibold text-gray-800 flex-1">{opt.name}</span>
+        <div className="flex items-center gap-3 shrink-0">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!!opt.hasImages}
+              onChange={() => toggleHasImages(opt.name)}
+              className="accent-amber-500 w-3.5 h-3.5"
+            />
+            <span className="text-[10px] text-gray-500">Có ảnh riêng</span>
+          </label>
+          <button type="button" onClick={() => removeOption(opt.name)} className="text-[10px] text-red-400 hover:text-red-600">
+            Xoá
+          </button>
+        </div>
+      </div>
+
+      {/* Values */}
+      <DndContext sensors={valueSensors} collisionDetection={closestCenter} onDragEnd={onValueDragEnd}>
+        {opt.hasImages ? (
+          <SortableContext items={opt.values} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-3 gap-2">
+              {opt.values.map((v) => (
+                <SortableValueCard
+                  key={v}
+                  id={v}
+                  optName={opt.name}
+                  imgUrl={opt.valueImages?.[v]}
+                  isUploading={!!uploadingImg[`${opt.name}__${v}`]}
+                  onUpload={uploadValueImage}
+                  onRemoveImage={removeValueImage}
+                  onRemoveValue={removeValue}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        ) : (
+          <SortableContext items={opt.values} strategy={horizontalListSortingStrategy}>
+            <div className="flex flex-wrap gap-1.5">
+              {opt.values.map((v) => (
+                <SortableValuePill key={v} id={v} optName={opt.name} onRemove={removeValue} />
+              ))}
+            </div>
+          </SortableContext>
+        )}
+      </DndContext>
+
+      <div className="flex items-center gap-1">
+        <input
+          type="text"
+          value={newValues[opt.name] || ''}
+          onChange={(e) => setNewValues((p) => ({ ...p, [opt.name]: e.target.value }))}
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addValue(opt.name))}
+          placeholder="+ giá trị"
+          className="text-[11px] border border-dashed border-gray-300 rounded-full px-2 py-0.5 w-24 outline-none focus:border-amber-400"
+        />
+        <button type="button" onClick={() => addValue(opt.name)} className="text-[11px] text-amber-600 font-medium">
+          Thêm
+        </button>
+      </div>
     </div>
   );
 };
@@ -282,130 +583,64 @@ const VariantManager = ({ initialOptions = [], initialVariants = [], onChange })
     notify(options, nextVars);
   };
 
+  const optionSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleOptionDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const oldIdx = options.findIndex((o) => o.name === active.id);
+    const newIdx = options.findIndex((o) => o.name === over.id);
+    const nextOpts = arrayMove(options, oldIdx, newIdx);
+    const nextVars = regenerateVariants(nextOpts, variants);
+    setOptions(nextOpts);
+    setVariants(nextVars);
+    notify(nextOpts, nextVars);
+  };
+
+  const handleValueDragEnd = (optName, { active, over }) => {
+    if (!over || active.id === over.id) return;
+    const opt = options.find((o) => o.name === optName);
+    if (!opt) return;
+    const oldIdx = opt.values.indexOf(active.id);
+    const newIdx = opt.values.indexOf(over.id);
+    const nextValues = arrayMove(opt.values, oldIdx, newIdx);
+    const nextOpts = options.map((o) => (o.name === optName ? { ...o, values: nextValues } : o));
+    const nextVars = regenerateVariants(nextOpts, variants);
+    setOptions(nextOpts);
+    setVariants(nextVars);
+    notify(nextOpts, nextVars);
+  };
+
   return (
     <div className="space-y-4 border border-amber-100 rounded-xl p-4 bg-amber-50/30">
       <p className="text-xs font-semibold text-gray-700">Biến thể sản phẩm</p>
       <p className="text-[10px] text-gray-400">
-        Thêm option (VD: Size, Màu) → thêm giá trị → bảng biến thể sẽ tự tạo ra.
+        Thêm option → thêm giá trị → kéo thả ⠿ để sắp xếp thứ tự.
       </p>
 
-      {/* Existing options */}
-      {options.map((opt) => (
-        <div key={opt.name} className="space-y-2 bg-white rounded-xl p-3 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-800">{opt.name}</span>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={!!opt.hasImages}
-                  onChange={() => toggleHasImages(opt.name)}
-                  className="accent-amber-500 w-3.5 h-3.5"
-                />
-                <span className="text-[10px] text-gray-500">Có ảnh riêng</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => removeOption(opt.name)}
-                className="text-[10px] text-red-400 hover:text-red-600"
-              >
-                Xoá option
-              </button>
-            </div>
-          </div>
-
-          {/* Values — hiển thị dạng grid khi có ảnh */}
-          {opt.hasImages ? (
-            <div className="grid grid-cols-3 gap-2">
-              {opt.values.map((v) => {
-                const imgUrl = opt.valueImages?.[v];
-                const key = `${opt.name}__${v}`;
-                const isUploading = !!uploadingImg[key];
-                return (
-                  <div key={v} className="border border-gray-100 rounded-xl p-2 space-y-1.5 text-center">
-                    <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-50">
-                      {imgUrl ? (
-                        <>
-                          <img src={imgUrl} alt={v} className="h-full w-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => removeValueImage(opt.name, v)}
-                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center"
-                          >
-                            ×
-                          </button>
-                        </>
-                      ) : (
-                        <label className={`flex flex-col items-center justify-center h-full cursor-pointer text-gray-400 hover:text-amber-500 transition ${isUploading ? 'pointer-events-none' : ''}`}>
-                          <span className="text-lg">{isUploading ? '…' : '+'}</span>
-                          <span className="text-[9px]">{isUploading ? 'Đang tải' : 'Upload'}</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            disabled={isUploading}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) uploadValueImage(opt.name, v, f);
-                              e.target.value = '';
-                            }}
-                          />
-                        </label>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-[11px] text-gray-700 truncate flex-1">{v}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeValue(opt.name, v)}
-                        className="text-[10px] text-red-400 hover:text-red-600 leading-none flex-shrink-0"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {opt.values.map((v) => (
-                <span
-                  key={v}
-                  className="inline-flex items-center gap-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full"
-                >
-                  {v}
-                  <button
-                    type="button"
-                    onClick={() => removeValue(opt.name, v)}
-                    className="text-amber-400 hover:text-red-500 leading-none"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center gap-1">
-            <input
-              type="text"
-              value={newValues[opt.name] || ''}
-              onChange={(e) => setNewValues((p) => ({ ...p, [opt.name]: e.target.value }))}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addValue(opt.name))}
-              placeholder="+ giá trị"
-              className="text-[11px] border border-dashed border-gray-300 rounded-full px-2 py-0.5 w-24 outline-none focus:border-amber-400"
+      {/* Existing options — sortable */}
+      <DndContext sensors={optionSensors} collisionDetection={closestCenter} onDragEnd={handleOptionDragEnd}>
+        <SortableContext items={options.map((o) => o.name)} strategy={verticalListSortingStrategy}>
+          {options.map((opt) => (
+            <SortableOptionBlock
+              key={opt.name}
+              opt={opt}
+              newValues={newValues}
+              setNewValues={setNewValues}
+              uploadingImg={uploadingImg}
+              toggleHasImages={toggleHasImages}
+              removeOption={removeOption}
+              addValue={addValue}
+              removeValue={removeValue}
+              uploadValueImage={uploadValueImage}
+              removeValueImage={removeValueImage}
+              onValueDragEnd={(e) => handleValueDragEnd(opt.name, e)}
             />
-            <button
-              type="button"
-              onClick={() => addValue(opt.name)}
-              className="text-[11px] text-amber-600 font-medium"
-            >
-              Thêm
-            </button>
-          </div>
-        </div>
-      ))}
+          ))}
+        </SortableContext>
+      </DndContext>
 
       {/* Add new option */}
       <div className="flex gap-2">

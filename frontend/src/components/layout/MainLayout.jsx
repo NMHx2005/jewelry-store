@@ -11,27 +11,33 @@ const MainLayout = () => {
   const openAuth = useUIStore((s) => s.openAuth);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#faf8f5' }}>
-      <header className="sticky top-0 z-20 backdrop-blur border-b" style={{ background: 'rgba(250,248,245,0.88)', borderColor: '#ebe5dc' }}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-          <Link to="/">
+    <div className="min-h-screen flex flex-col overflow-x-hidden" style={{ background: '#faf8f5' }}>
+      <header className="sticky top-0 z-20 backdrop-blur border-b" style={{ background: 'rgba(250,248,245,0.92)', borderColor: '#ebe5dc' }}>
+        <div className="max-w-6xl mx-auto flex items-center px-4 py-3 gap-3">
+          <Link to="/" className="shrink-0">
             <img
               src="/logo-diamond.png"
               alt="Logo"
-              className="h-11 w-11 object-cover rounded-full ring-2 ring-amber-200/60"
+              className="h-10 w-10 object-cover rounded-full ring-2 ring-amber-200/60"
             />
           </Link>
-          <nav className="flex items-center gap-6 text-sm font-medium" style={{ color: '#6e655d' }}>
-            <NavLink to="/" className="hover:text-amber-600 transition-colors">
+
+          {/* Brand name — hiện trên màn hình rộng */}
+          <span className="hidden sm:block text-sm font-semibold tracking-tight" style={{ color: '#7a6a5c' }}>
+            Trang Sức
+          </span>
+
+          <nav className="ml-auto flex items-center gap-3 sm:gap-5 text-xs sm:text-sm font-medium" style={{ color: '#6e655d' }}>
+            <NavLink to="/" className="hidden sm:block hover:text-amber-600 transition-colors whitespace-nowrap">
               Trang chủ
             </NavLink>
-            <NavLink to="/shop" className="hover:text-amber-600 transition-colors">
+            <NavLink to="/shop" className="hover:text-amber-600 transition-colors whitespace-nowrap">
               Cửa hàng
             </NavLink>
             <button
               type="button"
               onClick={openCart}
-              className="relative inline-flex items-center gap-1 hover:text-amber-600 transition-colors"
+              className="relative inline-flex items-center gap-1 hover:text-amber-600 transition-colors whitespace-nowrap"
             >
               <span>Giỏ hàng</span>
               {totalItems > 0 && (
@@ -44,12 +50,12 @@ const MainLayout = () => {
         </div>
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 min-w-0">
         <Outlet />
       </main>
 
       <footer className="border-t" style={{ background: '#f4f1eb', borderColor: '#ebe5dc' }}>
-        <div className="max-w-6xl mx-auto px-4 py-6 text-xs flex justify-between" style={{ color: '#9c9088' }}>
+        <div className="max-w-6xl mx-auto px-4 py-6 text-xs flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0" style={{ color: '#9c9088' }}>
           <p>© {new Date().getFullYear()} All rights reserved.</p>
           <p>Thiết kế dành riêng cho bạn.</p>
         </div>

@@ -60,9 +60,12 @@ const ProductCard = ({ product }) => {
       <button
         type="button"
         onClick={handleAddToCart}
-        className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full bg-amber-600 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200 shadow-sm"
+        className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full bg-amber-600 text-[11px] font-medium text-white
+          [@media(hover:none)]:opacity-100 [@media(hover:none)]:translate-y-0
+          opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0
+          transition-all duration-200 shadow-sm"
       >
-        Thêm vào giỏ
+        + Giỏ
       </button>
     </Link>
   );

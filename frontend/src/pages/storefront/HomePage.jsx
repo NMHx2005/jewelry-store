@@ -35,7 +35,7 @@ const HomePage = () => {
               autoplay={{ delay: 5000, disableOnInteraction: false }}
               loop
               pagination={{ clickable: true }}
-              className="h-[420px] md:h-[520px]"
+              className="h-[260px] sm:h-[360px] md:h-[520px]"
             >
               {(banners.length
                 ? banners

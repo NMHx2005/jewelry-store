@@ -116,7 +116,7 @@ const ProductDetailPage = () => {
   const mainDisplayImage = variantImage || images[selectedImage] || '';
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 lg:py-10 space-y-10">
+    <div className="max-w-5xl mx-auto px-4 py-6 md:py-8 lg:py-10 space-y-6 md:space-y-10 overflow-x-hidden">
       <nav className="text-[11px] text-slate-500 mb-2">
         <Link to="/shop" className="hover:text-amber-600">
           Cửa hàng
@@ -124,11 +124,11 @@ const ProductDetailPage = () => {
         / <span className="text-slate-700">{product.name}</span>
       </nav>
 
-      <section className="grid md:grid-cols-2 gap-8">
+      <section className="grid md:grid-cols-2 gap-5 md:gap-8">
         {/* Gallery */}
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           <div
-            className="aspect-square rounded-3xl bg-slate-50 overflow-hidden border border-slate-100 cursor-zoom-in group relative"
+            className="aspect-square rounded-2xl md:rounded-3xl bg-slate-50 overflow-hidden border border-slate-100 cursor-zoom-in group relative"
             onClick={() => setIsLightboxOpen(true)}
           >
             {mainDisplayImage ? (
@@ -142,36 +142,41 @@ const ProductDetailPage = () => {
                 Hình sản phẩm
               </div>
             )}
-            <div className="absolute bottom-3 right-3 text-[10px] px-2 py-1 rounded-full bg-white/80 border border-slate-200 text-slate-600">
+            {/* Ẩn badge trên mobile (touch devices đã biết tap để zoom) */}
+            <div className="hidden sm:block absolute bottom-3 right-3 text-[10px] px-2 py-1 rounded-full bg-white/80 border border-slate-200 text-slate-600">
               Nhấn để phóng lớn
             </div>
           </div>
-          <div className="flex gap-2 overflow-x-auto">
-            {images.map((img, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => { setSelectedImage(index); setVariantImage(null); }}
-                className={`h-16 w-16 rounded-2xl border ${
-                  !variantImage && index === selectedImage
-                    ? 'border-amber-500'
-                    : 'border-slate-200 hover:border-amber-200'
-                } overflow-hidden bg-slate-50 flex-shrink-0`}
-              >
-                {img ? (
-                  <img src={img} alt={`${product.name} ${index + 1}`} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center text-[10px] text-slate-400">
-                    Hình
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
+          {images.length > 1 && (
+            <div
+              className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-amber-200"
+            >
+              {images.map((img, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => { setSelectedImage(index); setVariantImage(null); }}
+                  className={`h-14 w-14 sm:h-16 sm:w-16 rounded-xl border-2 shrink-0 ${
+                    !variantImage && index === selectedImage
+                      ? 'border-amber-500'
+                      : 'border-transparent hover:border-amber-200'
+                  } overflow-hidden bg-slate-50`}
+                >
+                  {img ? (
+                    <img src={img} alt={`${product.name} ${index + 1}`} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-[10px] text-slate-400">
+                      Hình
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Info */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div>
             <p className="text-[11px] uppercase tracking-[0.28em] text-amber-600 mb-1">
               {product.category?.name || 'Trang sức'}
@@ -183,7 +188,7 @@ const ProductDetailPage = () => {
               {[product.material, product.gemstone].filter(Boolean).join(' • ')}
             </p>
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-xl font-semibold text-slate-900">
               {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(displayPrice)}
             </span>
@@ -326,17 +331,17 @@ const ProductDetailPage = () => {
           </div>
 
           {hasVariants && !allOptionsSelected && (
-            <p className="text-[10px] text-amber-600">
+            <p className="text-[10px] text-amber-600 break-words">
               ← Vui lòng chọn đầy đủ {product.options.map((o) => o.name).join(', ')} trước khi thêm vào giỏ
             </p>
           )}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-2 pt-2">
             <button
               type="button"
               onClick={handleAddToCart}
               disabled={!allOptionsSelected || displayStock === 0}
-              className="inline-flex flex-1 items-center justify-center rounded-full bg-amber-600 text-xs font-medium text-white py-2.5 hover:bg-amber-700 transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex flex-1 items-center justify-center rounded-full bg-amber-600 text-xs font-medium text-white py-3 hover:bg-amber-700 transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {displayStock === 0 ? 'Hết hàng' : 'Thêm vào giỏ'}
             </button>
@@ -344,7 +349,7 @@ const ProductDetailPage = () => {
               type="button"
               onClick={() => { handleAddToCart(); navigate('/checkout'); }}
               disabled={!allOptionsSelected || displayStock === 0}
-              className="inline-flex flex-1 items-center justify-center rounded-full border border-amber-400 text-xs font-medium text-amber-700 py-2.5 hover:bg-amber-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex flex-1 items-center justify-center rounded-full border border-amber-400 text-xs font-medium text-amber-700 py-3 hover:bg-amber-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Mua ngay
             </button>
@@ -431,15 +436,18 @@ const ProductDetailPage = () => {
           className="fixed inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center"
           onClick={() => setIsLightboxOpen(false)}
         >
-          <div className="relative max-w-3xl w-full px-4" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-3xl w-full px-3 sm:px-4" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               onClick={() => setIsLightboxOpen(false)}
-              className="absolute -top-8 right-4 text-xs text-slate-200 hover:text-white"
+              className="absolute -top-12 right-3 sm:right-4 h-10 w-10 flex items-center justify-center rounded-full bg-white/15 border border-white/25 text-white hover:bg-white/25 transition active:bg-white/30"
+              aria-label="Đóng"
             >
-              Đóng
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-            <div className="aspect-[4/3] rounded-3xl overflow-hidden bg-black/50">
+            <div className="aspect-square sm:aspect-4/3 rounded-2xl sm:rounded-3xl overflow-hidden bg-black/50">
               {mainDisplayImage && (
                 <img
                   src={mainDisplayImage}

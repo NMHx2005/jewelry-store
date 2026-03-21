@@ -63,7 +63,7 @@ const CheckoutPage = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 lg:py-10 grid lg:grid-cols-[minmax(0,1.5fr),minmax(0,1fr)] gap-8">
+    <div className="max-w-5xl mx-auto px-4 py-6 md:py-8 lg:py-10 grid lg:grid-cols-[minmax(0,1.5fr),minmax(0,1fr)] gap-6 lg:gap-8">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mb-1">
@@ -112,7 +112,7 @@ const CheckoutPage = () => {
         <button
           type="submit"
           disabled={isSubmitting || items.length === 0}
-          className="inline-flex items-center justify-center rounded-full bg-amber-600 text-xs font-medium text-white py-2.5 px-6 hover:bg-amber-700 transition disabled:opacity-60"
+          className="w-full sm:w-auto inline-flex items-center justify-center rounded-full bg-amber-600 text-xs font-medium text-white py-3 px-6 hover:bg-amber-700 transition disabled:opacity-60"
         >
           Xác nhận đặt hàng
         </button>
