@@ -86,6 +86,7 @@ export const getProducts = async (req, res, next) => {
     const [items, total] = await Promise.all([
       Product.find(filter)
         .populate('category')
+        .populate('industry')
         .sort(sort)
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum),
@@ -110,7 +111,7 @@ export const getProducts = async (req, res, next) => {
 export const getProductBySlug = async (req, res, next) => {
   try {
     const { slug } = req.params;
-    const product = await Product.findOne({ slug, isActive: true }).populate('category');
+    const product = await Product.findOne({ slug, isActive: true }).populate('category').populate('industry');
     if (!product) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm' });
     }

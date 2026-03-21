@@ -26,6 +26,7 @@ import {
   adminUpdateProduct,
   adminDeleteProduct,
   adminGetCategories,
+  adminGetIndustries,
   adminUploadImage,
 } from '../../services/adminService.js';
 
@@ -721,7 +722,7 @@ const VariantManager = ({ initialOptions = [], initialVariants = [], onChange })
 };
 
 /* ─── Form Modal ─── */
-const ProductForm = ({ initial, categories, onClose }) => {
+const ProductForm = ({ initial, categories, industries, onClose }) => {
   const qc = useQueryClient();
   const isEdit = !!initial;
   const [finalImages, setFinalImages] = useState(initial?.images || []);
@@ -730,7 +731,7 @@ const ProductForm = ({ initial, categories, onClose }) => {
     variants: initial?.variants || [],
   });
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     defaultValues: {
       name: initial?.name || '',
       description: initial?.description || '',
@@ -741,6 +742,7 @@ const ProductForm = ({ initial, categories, onClose }) => {
       gemstone: initial?.gemstone || '',
       weight: initial?.weight || '',
       materialDetail: initial?.materialDetail || '',
+      industry: initial?.industry?._id || initial?.industry || '',
       category: initial?.category?._id || initial?.category || '',
       isActive: initial?.isActive ?? true,
       isFeatured: initial?.isFeatured ?? false,
@@ -757,6 +759,14 @@ const ProductForm = ({ initial, categories, onClose }) => {
     onSuccess: () => qc.invalidateQueries(['adminProducts']),
   });
 
+  const selectedIndustry = watch('industry');
+  const filteredCategories = selectedIndustry
+    ? categories.filter((c) => {
+        const catInd = c.industry?._id || c.industry;
+        return catInd && catInd.toString() === selectedIndustry.toString();
+      })
+    : categories;
+
   const onSubmit = async (values) => {
     const hasVariants = variantData.options.length > 0 && variantData.variants.length > 0;
     const totalStock = hasVariants
@@ -771,6 +781,8 @@ const ProductForm = ({ initial, categories, onClose }) => {
       weight: values.weight ? Number(values.weight) : undefined,
       tags: values.tags ? values.tags.split(',').map((s) => s.trim()).filter(Boolean) : [],
       images: finalImages,
+      industry: values.industry || undefined,
+      category: values.category || undefined,
       options: hasVariants ? variantData.options : [],
       variants: hasVariants
         ? variantData.variants.map((v) => ({
@@ -848,13 +860,15 @@ const ProductForm = ({ initial, categories, onClose }) => {
           <div>
             <label className="text-gray-600 text-xs font-medium mb-1 block">
               Tồn kho
-              {variantData.options.length > 0 && (
-                <span className="ml-1 text-[10px] text-amber-500 font-normal">(tự tính từ variants)</span>
-              )}
+              {variantData.options.length > 0
+                ? <span className="ml-1 text-[10px] text-amber-500 font-normal">(tự tính từ biến thể bên dưới)</span>
+                : <span className="ml-1 text-[10px] text-gray-400 font-normal">(nhập tay nếu không có biến thể)</span>
+              }
             </label>
             <input
               {...register('stock')}
               type="number"
+              min={0}
               disabled={variantData.options.length > 0}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition disabled:bg-gray-50 disabled:text-gray-400"
             />
@@ -862,29 +876,52 @@ const ProductForm = ({ initial, categories, onClose }) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-gray-600 text-xs font-medium mb-1 block">Danh mục</label>
+              <label className="text-gray-600 text-xs font-medium mb-1 block">Ngành *</label>
               <select
-                {...register('category')}
-                className="w-full border border-gray-200 bg-white rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition"
+                {...register('industry', { required: true })}
+                onChange={(e) => {
+                  setValue('industry', e.target.value);
+                  setValue('category', '');
+                }}
+                className={`w-full border bg-white rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition ${errors.industry ? 'border-red-400' : 'border-gray-200'}`}
               >
-                <option value="">-- Chọn --</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>{c.name}</option>
+                <option value="">-- Chọn ngành --</option>
+                {(industries || []).map((ind) => (
+                  <option key={ind._id} value={ind._id}>{ind.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-gray-600 text-xs font-medium mb-1 block">Chất liệu *</label>
-              <input
-                {...register('material', { required: true })}
-                list="material-list"
-                className={`w-full border rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition ${errors.material ? 'border-red-400' : 'border-gray-200'}`}
-                placeholder="VD: Vàng 18K, Bạc 925..."
-              />
-              <datalist id="material-list">
-                {MATERIAL_SUGGESTIONS.map((m) => <option key={m} value={m} />)}
-              </datalist>
+              <label className="text-gray-600 text-xs font-medium mb-1 block">
+                Danh mục
+                {selectedIndustry && filteredCategories.length === 0 && (
+                  <span className="ml-1 text-[10px] text-gray-400 font-normal">(ngành này chưa có danh mục)</span>
+                )}
+              </label>
+              <select
+                {...register('category')}
+                disabled={!selectedIndustry}
+                className="w-full border border-gray-200 bg-white rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">-- Không có --</option>
+                {filteredCategories.map((c) => (
+                  <option key={c._id} value={c._id}>{c.name}</option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          <div>
+            <label className="text-gray-600 text-xs font-medium mb-1 block">Chất liệu</label>
+            <input
+              {...register('material')}
+              list="material-list"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition"
+              placeholder="VD: Vàng 18K, Bạc 925..."
+            />
+            <datalist id="material-list">
+              {MATERIAL_SUGGESTIONS.map((m) => <option key={m} value={m} />)}
+            </datalist>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1013,6 +1050,12 @@ const ProductsPage = () => {
     queryFn: adminGetCategories,
   });
   const categories = catRes?.data?.data || catRes?.data || [];
+
+  const { data: indRes } = useQuery({
+    queryKey: ['adminIndustries'],
+    queryFn: adminGetIndustries,
+  });
+  const industries = indRes?.data?.data || indRes?.data || [];
 
   const { data, isLoading } = useQuery({
     queryKey: ['adminProducts', page, search, categoryFilter],
@@ -1172,6 +1215,7 @@ const ProductsPage = () => {
         <ProductForm
           initial={editing}
           categories={categories}
+          industries={industries}
           onClose={() => { setShowForm(false); setEditing(null); }}
         />
       )}
